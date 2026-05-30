@@ -1,21 +1,19 @@
-const express = require("express");
-const cors = require("cors");
-require("dotenv").config();
+const app = require("./app");
+const { env } = require("./config/env");
+const { disconnectPrisma } = require("./config/prisma");
 
-const app = express();
+const server = app.listen(env.port, () => {
+  console.log(`Server running on port ${env.port}`);
+});
 
-app.use(cors());
-app.use(express.json());
+async function shutdown(signal) {
+  console.log(`${signal} received. Shutting down server.`);
 
-app.get("/api/health", (req, res) => {
-  res.json({
-    status: "ok",
-    message: "AI Contest Tracker Backend Running",
+  server.close(async () => {
+    await disconnectPrisma();
+    process.exit(0);
   });
-});
+}
 
-const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
