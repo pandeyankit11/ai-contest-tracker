@@ -27,6 +27,7 @@ const env = {
     process.env.BCRYPT_SALT_ROUNDS,
     DEFAULT_BCRYPT_SALT_ROUNDS
   ),
+  frontendUrl: process.env.FRONTEND_URL,
 };
 
 module.exports = {

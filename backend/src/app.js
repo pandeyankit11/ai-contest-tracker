@@ -10,11 +10,37 @@ const {
   errorHandler,
   notFoundHandler,
 } = require("./middleware/error.middleware");
+const { env } = require("./config/env");
 
 const app = express();
 
+const allowedOrigins = [];
+
+if (env.nodeEnv === "development") {
+  allowedOrigins.push("http://localhost:5173");
+}
+
+if (env.frontendUrl) {
+  allowedOrigins.push(env.frontendUrl);
+}
+
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+};
+
 app.use(helmet());
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 app.get("/api/health", (req, res) => {
