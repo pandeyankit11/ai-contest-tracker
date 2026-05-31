@@ -43,7 +43,7 @@ export const CodeforcesCard = () => {
   }
 
   return (
-    <article className="dashboard-card">
+    <article className="dashboard-card codeforces-card">
       <div className="card-heading">
         <div>
           <p className="eyebrow">Codeforces</p>

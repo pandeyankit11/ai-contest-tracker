@@ -57,7 +57,7 @@ export const UpcomingContestsPreview = () => {
   }, []);
 
   return (
-    <article className="dashboard-card dashboard-card-wide">
+    <article className="dashboard-card dashboard-card-wide upcoming-preview-card">
       <div className="card-heading">
         <div>
           <p className="eyebrow">Upcoming contests</p>

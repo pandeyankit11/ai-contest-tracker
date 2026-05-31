@@ -13,7 +13,8 @@ export const Header = () => {
   return (
     <header className="app-header">
       <NavLink className="brand" to="/dashboard">
-        AI Contest Tracker
+        <span className="brand-mark">AI</span>
+        <span>Contest Tracker</span>
       </NavLink>
 
       <nav className="app-nav" aria-label="Primary navigation">
@@ -23,7 +24,7 @@ export const Header = () => {
       </nav>
 
       <div className="user-menu">
-        <span>{user?.email}</span>
+        <span title={user?.email}>{user?.email}</span>
         <button type="button" onClick={handleLogout}>
           Logout
         </button>

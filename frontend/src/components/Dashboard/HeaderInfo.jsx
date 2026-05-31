@@ -51,26 +51,37 @@ export const HeaderInfo = () => {
 
   return (
     <section className="dashboard-hero dashboard-card">
-      <div>
+      <div className="hero-copy">
         <p className="eyebrow">Dashboard</p>
-        <h1>Welcome back{user?.email ? `, ${user.email}` : ''}</h1>
+        <h1>
+          Welcome back <span aria-hidden>👋</span>
+        </h1>
+        {user?.email ? (
+          <p className="hero-email muted">{user.email}</p>
+        ) : null}
         <p>
           Account created: <strong>{formatDate(user?.createdAt)}</strong>
         </p>
       </div>
 
-      {error ? (
-        <div className="inline-error" role="alert">
-          <span>{error}</span>
-          <button type="button" onClick={loadUser}>
-            Retry
-          </button>
+      <div className="hero-actions">
+        <div className="hero-metric">
+          <span>Status</span>
+          <strong>Authenticated</strong>
         </div>
-      ) : (
-        <Link className="secondary-action" to="/accounts">
-          Manage accounts
-        </Link>
-      )}
+        {error ? (
+          <div className="inline-error" role="alert">
+            <span>{error}</span>
+            <button type="button" onClick={loadUser}>
+              Retry
+            </button>
+          </div>
+        ) : (
+          <Link className="secondary-action" to="/accounts">
+            Manage accounts
+          </Link>
+        )}
+      </div>
     </section>
   );
 };

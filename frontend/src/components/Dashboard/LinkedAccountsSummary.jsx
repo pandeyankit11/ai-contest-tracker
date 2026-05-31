@@ -59,7 +59,7 @@ export const LinkedAccountsSummary = () => {
   }
 
   return (
-    <article className="dashboard-card">
+    <article className="dashboard-card linked-summary-card">
       <div className="card-heading">
         <div>
           <p className="eyebrow">Linked accounts</p>

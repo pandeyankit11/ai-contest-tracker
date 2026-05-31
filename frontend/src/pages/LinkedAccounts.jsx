@@ -115,6 +115,7 @@ export const LinkedAccounts = () => {
       <Header />
       <main className="page-shell accounts-shell">
         <section className="page-heading">
+          <p className="eyebrow">Platform identity</p>
           <h1>Linked Accounts</h1>
           <p>Connect coding platform handles used for dashboard summaries.</p>
         </section>
@@ -130,7 +131,8 @@ export const LinkedAccounts = () => {
         )}
 
         <section className="accounts-layout">
-          <form className="account-form panel-section" onSubmit={handleSubmit}>
+          <form className="account-form panel-section accent-panel" onSubmit={handleSubmit}>
+            <p className="eyebrow">New connection</p>
             <h2>Add account</h2>
 
             <label htmlFor="platform">Platform</label>

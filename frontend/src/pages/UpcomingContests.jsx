@@ -134,6 +134,7 @@ export const UpcomingContests = () => {
       <Header />
       <main className="page-shell contests-shell">
         <section className="page-heading">
+          <p className="eyebrow">Contest intelligence</p>
           <h1>Upcoming Contests</h1>
           <p>Browse upcoming contests by platform, time range, and page size.</p>
         </section>
