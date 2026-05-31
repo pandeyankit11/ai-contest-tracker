@@ -16,6 +16,14 @@ enum Platform {
   LEETCODE
 }
 
+enum ContestPhase {
+  BEFORE
+  CODING
+  PENDING_SYSTEM_TEST
+  SYSTEM_TEST
+  FINISHED
+}
+
 model User {
   id              String           @id @default(cuid())
   email           String           @unique
@@ -37,3 +45,21 @@ model ContestAccount {
   @@unique([userId, platform])
   @@index([userId])
 }
+
+model Contest {
+  id              String       @id @default(cuid())
+  externalId      Int
+  platform        Platform
+  name            String
+  phase           ContestPhase
+  startTime       DateTime
+  endTime         DateTime
+  durationSeconds Int
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@unique([platform, externalId])
+  @@index([startTime])
+  @@index([platform, startTime])
+}
+

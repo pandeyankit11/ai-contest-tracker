@@ -4,6 +4,7 @@ const cors = require("cors");
 const authRoutes = require("./routes/auth.routes");
 const codeforcesRoutes = require("./routes/codeforces.routes");
 const platformRoutes = require("./routes/platform.routes");
+const contestRoutes = require("./routes/contest.routes");
 const {
   errorHandler,
   notFoundHandler,
@@ -24,6 +25,7 @@ app.get("/api/health", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/platforms", platformRoutes);
 app.use("/api/codeforces", codeforcesRoutes);
+app.use("/api/contests", contestRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
