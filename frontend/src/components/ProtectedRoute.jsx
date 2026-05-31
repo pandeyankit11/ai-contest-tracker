@@ -5,7 +5,11 @@ export const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="loading-screen" role="status" aria-live="polite">
+        Loading...
+      </div>
+    );
   }
 
   if (!isAuthenticated) {

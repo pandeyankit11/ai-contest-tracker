@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
+import { AuthProvider } from './context/AuthContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -9,21 +10,20 @@ import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
   return (
-    <Router>
-      <div className="app">
-        <nav>
-          <h1>AI Contest Tracker</h1>
-          <ul>
-            <li><a href="/">Home</a></li>
-            <li><a href="/login">Login</a></li>
-            <li><a href="/register">Register</a></li>
-          </ul>
-        </nav>
-
-        <main>
+    <AuthProvider>
+      <Router>
+        <div className="app">
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/dashboard"
               element={
@@ -33,7 +33,7 @@ function App() {
               }
             />
             <Route
-              path="/linked-accounts"
+              path="/accounts"
               element={
                 <ProtectedRoute>
                   <LinkedAccounts />
@@ -41,22 +41,26 @@ function App() {
               }
             />
             <Route
-              path="/upcoming-contests"
+              path="/linked-accounts"
+              element={<Navigate to="/accounts" replace />}
+            />
+            <Route
+              path="/contests"
               element={
                 <ProtectedRoute>
                   <UpcomingContests />
                 </ProtectedRoute>
               }
             />
-            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route
+              path="/upcoming-contests"
+              element={<Navigate to="/contests" replace />}
+            />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
-        </main>
-
-        <footer>
-          <p>&copy; 2024 AI Contest Tracker. All rights reserved.</p>
-        </footer>
-      </div>
-    </Router>
+        </div>
+      </Router>
+    </AuthProvider>
   );
 }
 

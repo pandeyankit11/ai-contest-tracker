@@ -1,27 +1,34 @@
+import { Link } from 'react-router-dom';
+import Header from '../components/Header';
 import { useAuth } from '../context/AuthContext';
 
 export const Dashboard = () => {
   const { user } = useAuth();
 
   return (
-    <div>
-      <h1>Dashboard</h1>
-      <p>Welcome to your AI Contest Tracker Dashboard!</p>
-      {user && <p>Logged in as: {user.email}</p>}
-      
-      <div>
-        <h2>Quick Links</h2>
-        <ul>
-          <li><a href="/linked-accounts">Linked Accounts</a></li>
-          <li><a href="/upcoming-contests">Upcoming Contests</a></li>
-        </ul>
-      </div>
+    <>
+      <Header />
+      <main className="page-shell">
+        <section className="page-heading">
+          <h1>Dashboard</h1>
+          <p>Welcome back{user?.email ? `, ${user.email}` : ''}.</p>
+        </section>
 
-      <section>
-        <h2>Dashboard Content</h2>
-        <p>Your contest tracking statistics and insights will appear here.</p>
-      </section>
-    </div>
+        <section className="content-grid">
+          <article className="summary-card">
+            <h2>Linked Accounts</h2>
+            <p>Connect coding platforms before contest insights appear here.</p>
+            <Link to="/accounts">Manage accounts</Link>
+          </article>
+
+          <article className="summary-card">
+            <h2>Upcoming Contests</h2>
+            <p>Review upcoming contests across your connected platforms.</p>
+            <Link to="/contests">View contests</Link>
+          </article>
+        </section>
+      </main>
+    </>
   );
 };
 
