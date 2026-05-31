@@ -1,5 +1,6 @@
 const { prisma } = require("../config/prisma");
-const { syncCodeforcesContests } = require("../services/contest.service");
+const { syncCodeforcesContests, getUpcomingContests } = require("../services/contest.service");
+const { validateUpcomingContestsQuery } = require("../validators/contest.validator");
 const { asyncHandler } = require("../utils/asyncHandler");
 
 const syncContests = asyncHandler(async (req, res) => {
@@ -22,7 +23,19 @@ const getAllContests = asyncHandler(async (req, res) => {
   });
 });
 
+const getUpcoming = asyncHandler(async (req, res) => {
+  const queryParams = validateUpcomingContestsQuery(req.query);
+  const result = await getUpcomingContests(queryParams);
+
+  res.status(200).json({
+    success: true,
+    data: result.contests,
+    pagination: result.pagination,
+  });
+});
+
 module.exports = {
   syncContests,
   getAllContests,
+  getUpcoming,
 };

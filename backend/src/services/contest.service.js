@@ -172,10 +172,49 @@ async function syncCodeforcesContests() {
   return results;
 }
 
+async function getUpcomingContests({ page, limit, days, platform }) {
+  const now = new Date();
+  const futureDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+
+  const where = {
+    startTime: {
+      gte: now,
+      lte: futureDate,
+    },
+  };
+
+  if (platform) {
+    where.platform = platform;
+  }
+
+  const skip = (page - 1) * limit;
+
+  const [contests, total] = await Promise.all([
+    prisma.contest.findMany({
+      where,
+      orderBy: [{ startTime: "asc" }],
+      skip,
+      take: limit,
+    }),
+    prisma.contest.count({ where }),
+  ]);
+
+  return {
+    contests,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+}
+
 module.exports = {
   CODEFORCES_PLATFORM,
   CODEFORCES_CONTESTS_URL,
   syncCodeforcesContests,
   setContestsFetchImplementation,
   resetContestsFetchImplementation,
+  getUpcomingContests,
 };
