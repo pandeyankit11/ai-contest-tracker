@@ -42,8 +42,8 @@ export const UpcomingContestsPreview = () => {
     setError('');
 
     try {
-      const data = await contestAPI.upcoming(5);
-      setContests(Array.isArray(data) ? data : []);
+      const result = await contestAPI.upcoming({ limit: 5 });
+      setContests(Array.isArray(result.data) ? result.data : []);
     } catch (requestError) {
       setContests([]);
       setError(requestError.message || 'Unable to load upcoming contests');

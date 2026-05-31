@@ -106,6 +106,11 @@ curl http://localhost:5000/api/health
 | POST | `/api/auth/register` | `{email, password}` | `{success, data: {token, user}}` | No |
 | POST | `/api/auth/login` | `{email, password}` | `{success, data: {token, user}}` | No |
 | GET | `/api/auth/me` | — | `{success, data: {user}}` | Yes (Bearer token) |
+| POST | `/api/auth/refresh` | — | `{success, data: {token}}` | No (uses httpOnly refresh cookie when available) |
+
+**Refresh token strategy (optional)**
+
+If the backend supports refresh tokens, call `POST /api/auth/refresh` to obtain a new access token when the access token expires. Prefer storing the refresh token in an httpOnly cookie (safer against XSS). If refresh tokens are not available, handle 401 responses by clearing local state and redirecting users to `/login` to re-authenticate.
 
 ### 5.2 Request/Response Format
 

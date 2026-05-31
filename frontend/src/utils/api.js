@@ -70,9 +70,10 @@ function getErrorMessage(payload, status) {
 }
 
 async function request(endpoint, options = {}) {
+  const { returnEnvelope = false, ...fetchOptions } = options;
   const headers = {
     'Content-Type': 'application/json',
-    ...(options.headers || {}),
+    ...(fetchOptions.headers || {}),
   };
   const token = getStoredToken();
 
@@ -84,7 +85,7 @@ async function request(endpoint, options = {}) {
 
   try {
     response = await fetch(buildUrl(endpoint), {
-      ...options,
+      ...fetchOptions,
       headers,
     });
   } catch {
@@ -107,7 +108,7 @@ async function request(endpoint, options = {}) {
     throw error;
   }
 
-  return payload?.data ?? payload;
+  return returnEnvelope ? payload : payload?.data ?? payload;
 }
 
 export const api = {
@@ -147,7 +148,21 @@ export const platformAPI = {
 };
 
 export const contestAPI = {
-  upcoming: (limit = 5) => api.get(`/api/contests/upcoming?limit=${limit}`),
+  upcoming: ({ page = 1, limit = 5, days = 30, platform = '' } = {}) => {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+      days: String(days),
+    });
+
+    if (platform) {
+      params.set('platform', platform);
+    }
+
+    return api.get(`/api/contests/upcoming?${params.toString()}`, {
+      returnEnvelope: true,
+    });
+  },
 };
 
 export default api;

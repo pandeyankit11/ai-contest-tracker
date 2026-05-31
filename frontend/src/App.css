@@ -65,6 +65,8 @@
 .auth-form button,
 .account-form button,
 .accounts-list-panel button,
+.contest-controls button,
+.contest-browser button,
 .summary-card button,
 .dashboard-card button,
 .user-menu button {
@@ -458,6 +460,63 @@ button:disabled {
   background: #b42318;
 }
 
+.contests-shell {
+  display: grid;
+  gap: 18px;
+}
+
+.contest-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(160px, 1fr)) auto;
+  gap: 16px;
+  align-items: end;
+  margin-top: 0;
+}
+
+.contest-controls label {
+  display: grid;
+  gap: 8px;
+  color: #102a43;
+  font-weight: 700;
+}
+
+.contest-controls select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #bcccdc;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #102a43;
+  box-sizing: border-box;
+  font: inherit;
+}
+
+.contest-controls select:focus {
+  border-color: #2f80ed;
+  outline: 3px solid rgba(47, 128, 237, 0.18);
+}
+
+.contest-browser {
+  margin-top: 0;
+}
+
+.contest-table-wrap {
+  overflow-x: auto;
+}
+
+.contest-table strong {
+  color: #102a43;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  margin-top: 18px;
+}
+
 table {
   width: 100%;
   margin-top: 16px;
@@ -498,6 +557,15 @@ th {
 
   .accounts-layout {
     grid-template-columns: 1fr;
+  }
+
+  .contest-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .pagination-controls {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .dashboard-hero,
