@@ -136,4 +136,18 @@ export const authAPI = {
   me: () => api.get('/api/auth/me'),
 };
 
+export const codeforcesAPI = {
+  profile: () => api.get('/api/codeforces/profile'),
+};
+
+export const platformAPI = {
+  list: () => api.get('/api/platforms'),
+  create: (platform, handle) => api.post('/api/platforms', { platform, handle }),
+  delete: (id) => api.delete(`/api/platforms/${id}`),
+};
+
+export const contestAPI = {
+  upcoming: (limit = 5) => api.get(`/api/contests/upcoming?limit=${limit}`),
+};
+
 export default api;
