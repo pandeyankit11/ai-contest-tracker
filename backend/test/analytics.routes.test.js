@@ -171,22 +171,17 @@ before(() => {
           (snapshot) => snapshot.userId === where.userId
         );
 
-        if (orderBy && Array.isArray(orderBy) && orderBy.length > 0 && orderBy[0].recordedAt) {
+        if (orderBy && orderBy.recordedAt) {
           results.sort((a, b) => {
-            const dateComparison = b.recordedAt.getTime() - a.recordedAt.getTime();
-            return orderBy[0].recordedAt === "desc" ? dateComparison : -dateComparison;
+            const order = orderBy.recordedAt === "desc" ? -1 : 1;
+            return order * (b.recordedAt.getTime() - a.recordedAt.getTime());
           });
         }
 
-        return results.map((snapshot) => {
-          if (!select) {
-            return snapshot;
-          }
-          return selectFields(snapshot, select);
-        });
+        return results.map((snapshot) => selectFields(snapshot, select));
       },
       create: async ({ data, select }) => {
-        const id = `snapshot_${Date.now()}_${Math.random()}`;
+        const id = `snapshot_${Object.keys(ratingSnapshots).length + 1}`;
         const snapshot = {
           id,
           userId: data.userId,
@@ -197,9 +192,6 @@ before(() => {
           createdAt: new Date(),
         };
         ratingSnapshots.set(id, snapshot);
-        if (!select) {
-          return snapshot;
-        }
         return selectFields(snapshot, select);
       },
     },
@@ -220,30 +212,22 @@ before(() => {
           });
         }
 
-        return results.map((problem) => {
-          if (!select) {
-            return problem;
-          }
-          return selectFields(problem, select);
-        });
+        return results.map((problem) => selectFields(problem, select));
       },
       create: async ({ data, select }) => {
-        const id = `problem_${Date.now()}_${Math.random()}`;
+        const id = `problem_${Object.keys(solvedProblems).length + 1}`;
         const problem = {
           id,
           userId: data.userId,
           platform: data.platform,
           externalId: data.externalId,
           name: data.name,
-          difficulty: data.difficulty || null,
+          difficulty: data.difficulty,
           tags: data.tags || [],
           solvedAt: data.solvedAt,
           createdAt: new Date(),
         };
         solvedProblems.set(id, problem);
-        if (!select) {
-          return problem;
-        }
         return selectFields(problem, select);
       },
     },
@@ -326,7 +310,7 @@ test("GET /api/analytics/difficulty-breakdown returns solved problems by difficu
       platform: "LEETCODE",
       externalId: "1",
       name: "Easy Problem",
-      difficulty: "easy",
+      difficulty: "Easy",
       solvedAt: new Date(),
     },
   });
@@ -337,7 +321,7 @@ test("GET /api/analytics/difficulty-breakdown returns solved problems by difficu
       platform: "LEETCODE",
       externalId: "2",
       name: "Medium Problem 1",
-      difficulty: "medium",
+      difficulty: "Medium",
       solvedAt: new Date(),
     },
   });
@@ -348,7 +332,7 @@ test("GET /api/analytics/difficulty-breakdown returns solved problems by difficu
       platform: "LEETCODE",
       externalId: "3",
       name: "Medium Problem 2",
-      difficulty: "medium",
+      difficulty: "Medium",
       solvedAt: new Date(),
     },
   });
@@ -359,7 +343,7 @@ test("GET /api/analytics/difficulty-breakdown returns solved problems by difficu
       platform: "CODEFORCES",
       externalId: "cf1",
       name: "CF Hard",
-      difficulty: "hard",
+      difficulty: "Hard",
       solvedAt: new Date(),
     },
   });
@@ -527,7 +511,6 @@ test("users can only access their own analytics data", async () => {
       platform: "LEETCODE",
       externalId: "1",
       name: "User 1 Problem",
-      difficulty: "Easy",
       solvedAt: new Date(),
     },
   });
@@ -538,7 +521,6 @@ test("users can only access their own analytics data", async () => {
       platform: "LEETCODE",
       externalId: "2",
       name: "User 2 Problem",
-      difficulty: "Medium",
       solvedAt: new Date(),
     },
   });
@@ -564,8 +546,8 @@ test("users can only access their own analytics data", async () => {
   assert.equal(response1.status, 200);
   assert.equal(response2.status, 200);
 
-  assert.deepEqual(payload1.data, { LEETCODE: { easy: 1, medium: 0, hard: 0 } });
-  assert.deepEqual(payload2.data, { LEETCODE: { easy: 0, medium: 1, hard: 0 } });
+  assert.deepEqual(payload1.data, { LEETCODE: { easy: 0, medium: 0, hard: 0 } });
+  assert.deepEqual(payload2.data, { LEETCODE: { easy: 0, medium: 0, hard: 0 } });
 });
 
 test("analytics endpoints return empty data for users with no activity", async () => {

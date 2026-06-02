@@ -1,40 +1,21 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
-}
-
-enum Platform {
-  CODEFORCES
-  LEETCODE
-  CODECHEF
-}
-
-enum ContestPhase {
-  BEFORE
-  CODING
-  PENDING_SYSTEM_TEST
-  SYSTEM_TEST
-  FINISHED
+  
 }
 
 model User {
   id                    String                 @id @default(cuid())
   email                 String                 @unique
   password              String
+  createdAt             DateTime               @default(now())
   contestAccounts       ContestAccount[]
+  contestParticipations ContestParticipation[]
   ratingSnapshots       RatingSnapshot[]
   solvedProblems        SolvedProblem[]
-  contestParticipations ContestParticipation[]
-
-  createdAt DateTime @default(now())
 }
 
 model ContestAccount {
@@ -43,8 +24,7 @@ model ContestAccount {
   platform  Platform
   handle    String
   createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, platform])
   @@index([userId])
@@ -61,8 +41,8 @@ model Contest {
   durationSeconds Int
   createdAt       DateTime               @default(now())
   updatedAt       DateTime               @updatedAt
-  solvedProblems  SolvedProblem[]
   participations  ContestParticipation[]
+  solvedProblems  SolvedProblem[]
 
   @@unique([platform, externalId])
   @@index([startTime])
@@ -78,8 +58,7 @@ model RatingSnapshot {
   rank       String?
   recordedAt DateTime @default(now())
   createdAt  DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, platform, recordedAt])
   @@index([userId, platform, recordedAt])
@@ -100,9 +79,8 @@ model SolvedProblem {
   solvedAt   DateTime
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
-
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  contest Contest? @relation(fields: [contestId], references: [id], onDelete: SetNull)
+  contest    Contest? @relation(fields: [contestId], references: [id])
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, platform, externalId])
   @@index([userId, platform, solvedAt])
@@ -127,13 +105,26 @@ model ContestParticipation {
   participatedAt    DateTime
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
-
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  contest Contest? @relation(fields: [contestId], references: [id], onDelete: SetNull)
+  contest           Contest? @relation(fields: [contestId], references: [id])
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, platform, externalContestId])
   @@index([userId, platform, participatedAt])
   @@index([platform, participatedAt])
   @@index([contestId])
   @@index([userId, platform, ratingChange])
+}
+
+enum Platform {
+  CODEFORCES
+  LEETCODE
+  CODECHEF
+}
+
+enum ContestPhase {
+  BEFORE
+  CODING
+  PENDING_SYSTEM_TEST
+  SYSTEM_TEST
+  FINISHED
 }

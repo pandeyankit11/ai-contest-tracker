@@ -2,6 +2,8 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 
+const { prisma } = require("./config/prisma");
+
 const authRoutes = require("./routes/auth.routes");
 const codeforcesRoutes = require("./routes/codeforces.routes");
 const platformRoutes = require("./routes/platform.routes");
@@ -49,6 +51,29 @@ app.get("/api/health", (req, res) => {
     status: "ok",
     message: "AI Contest Tracker Backend Running",
   });
+});
+
+app.get("/api/test-db", async (req, res) => {
+  try {
+    console.log("Route hit");
+
+    await prisma.$connect();
+    console.log("Connected");
+
+    const result = await prisma.$queryRaw`SELECT NOW()`;
+
+    console.log("RAW OK", result);
+
+    res.json(result);
+  } catch (err) {
+    console.error("RAW ERROR", err);
+
+    res.status(500).json({
+      success: false,
+      code: err.code,
+      message: err.message,
+    });
+  }
 });
 
 app.use("/api/auth", authRoutes);
