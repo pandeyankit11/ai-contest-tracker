@@ -13,13 +13,21 @@ const { Duplex } = require("node:stream");
 const app = require("../src/app");
 const { prisma } = require("../src/config/prisma");
 const {
+  CODEFORCES_RATING_HISTORY_URL,
+  CODEFORCES_SUBMISSIONS_URL,
   CODEFORCES_USER_INFO_URL,
   resetCodeforcesFetchImplementation,
   setCodeforcesFetchImplementation,
+  syncRatingHistory,
+  syncSolvedProblems,
 } = require("../src/services/codeforces.service");
 
 let accountSequence;
 let accounts;
+let ratingSnapshotSequence;
+let ratingSnapshots;
+let solvedProblemSequence;
+let solvedProblems;
 let userSequence;
 let users;
 
@@ -154,6 +162,8 @@ async function addPlatformAccount(token, platform, handle) {
 before(() => {
   users = new Map();
   accounts = new Map();
+  ratingSnapshots = new Map();
+  solvedProblems = new Map();
 
   Object.defineProperty(prisma, "user", {
     configurable: true,
@@ -253,12 +263,99 @@ before(() => {
       },
     },
   });
+
+  Object.defineProperty(prisma, "ratingSnapshot", {
+    configurable: true,
+    value: {
+      upsert: async ({ where, update, create, select }) => {
+        const uniqueWhere = where.userId_platform_recordedAt;
+        const key = [
+          uniqueWhere.userId,
+          uniqueWhere.platform,
+          uniqueWhere.recordedAt.toISOString(),
+        ].join("_");
+
+        let snapshot = ratingSnapshots.get(key);
+
+        if (snapshot) {
+          snapshot = {
+            ...snapshot,
+            ...update,
+          };
+        } else {
+          ratingSnapshotSequence += 1;
+          snapshot = {
+            id: `rating_snapshot_${ratingSnapshotSequence}`,
+            userId: create.userId,
+            platform: create.platform,
+            rating: create.rating,
+            maxRating: create.maxRating,
+            rank: create.rank,
+            recordedAt: create.recordedAt,
+            createdAt: new Date(`2026-05-31T00:02:0${ratingSnapshotSequence}.000Z`),
+          };
+        }
+
+        ratingSnapshots.set(key, snapshot);
+
+        return selectFields(snapshot, select);
+      },
+    },
+  });
+
+  Object.defineProperty(prisma, "solvedProblem", {
+    configurable: true,
+    value: {
+      upsert: async ({ where, update, create, select }) => {
+        const uniqueWhere = where.userId_platform_externalId;
+        const key = [
+          uniqueWhere.userId,
+          uniqueWhere.platform,
+          uniqueWhere.externalId,
+        ].join("_");
+
+        let solvedProblem = solvedProblems.get(key);
+
+        if (solvedProblem) {
+          solvedProblem = {
+            ...solvedProblem,
+            ...update,
+          };
+        } else {
+          solvedProblemSequence += 1;
+          solvedProblem = {
+            id: `solved_problem_${solvedProblemSequence}`,
+            userId: create.userId,
+            contestId: create.contestId,
+            platform: create.platform,
+            externalId: create.externalId,
+            name: create.name,
+            url: create.url,
+            tags: create.tags,
+            difficulty: create.difficulty,
+            rating: create.rating,
+            solvedAt: create.solvedAt,
+            createdAt: new Date(`2026-05-31T00:03:0${solvedProblemSequence}.000Z`),
+            updatedAt: new Date(`2026-05-31T00:03:0${solvedProblemSequence}.000Z`),
+          };
+        }
+
+        solvedProblems.set(key, solvedProblem);
+
+        return selectFields(solvedProblem, select);
+      },
+    },
+  });
 });
 
 beforeEach(() => {
   accountSequence = 0;
+  ratingSnapshotSequence = 0;
+  solvedProblemSequence = 0;
   userSequence = 0;
   accounts.clear();
+  ratingSnapshots.clear();
+  solvedProblems.clear();
   users.clear();
   resetCodeforcesFetchImplementation();
 });
@@ -465,4 +562,286 @@ test("handles invalid Codeforces profile payload", async () => {
 
   assert.equal(response.status, 502);
   assert.equal(payload.error.code, "CODEFORCES_INVALID_RESPONSE");
+});
+
+test("syncs Codeforces rating history snapshots idempotently", async () => {
+  let requestedUrl;
+  let requestedOptions;
+
+  setCodeforcesFetchImplementation(async (url, options) => {
+    requestedUrl = url;
+    requestedOptions = options;
+
+    return mockCodeforcesResponse({
+      status: "OK",
+      result: [
+        {
+          contestId: 2,
+          contestName: "Codeforces Round 2",
+          handle: "tourist",
+          rank: 20,
+          ratingUpdateTimeSeconds: 1_775_000_200,
+          oldRating: 1300,
+          newRating: 1500,
+        },
+        {
+          contestId: 1,
+          contestName: "Codeforces Round 1",
+          handle: "tourist",
+          rank: 100,
+          ratingUpdateTimeSeconds: 1_775_000_100,
+          oldRating: 0,
+          newRating: 1200,
+        },
+        {
+          contestId: 3,
+          contestName: "Codeforces Round 3",
+          handle: "tourist",
+          rank: 50,
+          ratingUpdateTimeSeconds: 1_775_000_150,
+          oldRating: 1200,
+          newRating: 1300,
+        },
+      ],
+    });
+  });
+
+  const firstResult = await syncRatingHistory("user_1", "tourist");
+  const secondResult = await syncRatingHistory("user_1", "tourist");
+  const storedSnapshots = Array.from(ratingSnapshots.values()).sort(
+    (left, right) => left.recordedAt - right.recordedAt
+  );
+
+  assert.equal(requestedUrl, `${CODEFORCES_RATING_HISTORY_URL}?handle=tourist`);
+  assert.equal(requestedOptions.method, "GET");
+  assert.deepEqual(firstResult, {
+    processed: 3,
+    upserted: 3,
+    failed: 0,
+  });
+  assert.deepEqual(secondResult, {
+    processed: 3,
+    upserted: 3,
+    failed: 0,
+  });
+  assert.equal(ratingSnapshots.size, 3);
+  assert.deepEqual(
+    storedSnapshots.map((snapshot) => ({
+      userId: snapshot.userId,
+      platform: snapshot.platform,
+      rating: snapshot.rating,
+      maxRating: snapshot.maxRating,
+      rank: snapshot.rank,
+      recordedAt: snapshot.recordedAt.toISOString(),
+    })),
+    [
+      {
+        userId: "user_1",
+        platform: "CODEFORCES",
+        rating: 1200,
+        maxRating: 1200,
+        rank: null,
+        recordedAt: "2026-03-31T23:35:00.000Z",
+      },
+      {
+        userId: "user_1",
+        platform: "CODEFORCES",
+        rating: 1300,
+        maxRating: 1300,
+        rank: null,
+        recordedAt: "2026-03-31T23:35:50.000Z",
+      },
+      {
+        userId: "user_1",
+        platform: "CODEFORCES",
+        rating: 1500,
+        maxRating: 1500,
+        rank: null,
+        recordedAt: "2026-03-31T23:36:40.000Z",
+      },
+    ]
+  );
+});
+
+test("records failed Codeforces rating history entries without storing invalid snapshots", async () => {
+  setCodeforcesFetchImplementation(async () =>
+    mockCodeforcesResponse({
+      status: "OK",
+      result: [
+        {
+          ratingUpdateTimeSeconds: 1_775_000_100,
+          newRating: 1200,
+        },
+        {
+          ratingUpdateTimeSeconds: "invalid",
+          newRating: 1300,
+        },
+      ],
+    })
+  );
+
+  const result = await syncRatingHistory("user_1", "tourist");
+
+  assert.deepEqual(result, {
+    processed: 1,
+    upserted: 1,
+    failed: 1,
+  });
+  assert.equal(ratingSnapshots.size, 1);
+});
+
+test("syncs unique accepted Codeforces solved problems idempotently", async () => {
+  let requestedUrl;
+  let requestedOptions;
+
+  setCodeforcesFetchImplementation(async (url, options) => {
+    requestedUrl = url;
+    requestedOptions = options;
+
+    return mockCodeforcesResponse({
+      status: "OK",
+      result: [
+        {
+          id: 10,
+          creationTimeSeconds: 1_775_000_200,
+          verdict: "OK",
+          problem: {
+            contestId: 1000,
+            index: "A",
+            name: "Watermelon",
+            tags: ["brute force", "math"],
+            rating: 800,
+          },
+        },
+        {
+          id: 11,
+          creationTimeSeconds: 1_775_000_100,
+          verdict: "OK",
+          problem: {
+            contestId: 1000,
+            index: "A",
+            name: "Watermelon",
+            tags: ["brute force", "math"],
+            rating: 800,
+          },
+        },
+        {
+          id: 12,
+          creationTimeSeconds: 1_775_000_300,
+          verdict: "WRONG_ANSWER",
+          problem: {
+            contestId: 1001,
+            index: "B",
+            name: "Ignored Wrong Answer",
+            tags: ["implementation"],
+            rating: 900,
+          },
+        },
+        {
+          id: 13,
+          creationTimeSeconds: 1_775_000_400,
+          verdict: "OK",
+          problem: {
+            contestId: 1002,
+            index: "C",
+            name: "Unrated Problem",
+            tags: ["dp"],
+          },
+        },
+      ],
+    });
+  });
+
+  const firstResult = await syncSolvedProblems("user_1", "tourist");
+  const secondResult = await syncSolvedProblems("user_1", "tourist");
+  const storedSolvedProblems = Array.from(solvedProblems.values()).sort(
+    (left, right) => left.externalId.localeCompare(right.externalId)
+  );
+
+  assert.equal(requestedUrl, `${CODEFORCES_SUBMISSIONS_URL}?handle=tourist`);
+  assert.equal(requestedOptions.method, "GET");
+  assert.deepEqual(firstResult, {
+    processed: 2,
+    upserted: 2,
+    failed: 0,
+  });
+  assert.deepEqual(secondResult, {
+    processed: 2,
+    upserted: 2,
+    failed: 0,
+  });
+  assert.equal(solvedProblems.size, 2);
+  assert.deepEqual(
+    storedSolvedProblems.map((problem) => ({
+      userId: problem.userId,
+      platform: problem.platform,
+      problemId: problem.externalId,
+      name: problem.name,
+      tags: problem.tags,
+      rating: problem.rating,
+      solvedAt: problem.solvedAt.toISOString(),
+      url: problem.url,
+    })),
+    [
+      {
+        userId: "user_1",
+        platform: "CODEFORCES",
+        problemId: "1000-A",
+        name: "Watermelon",
+        tags: ["brute force", "math"],
+        rating: 800,
+        solvedAt: "2026-03-31T23:35:00.000Z",
+        url: "https://codeforces.com/problemset/problem/1000/A",
+      },
+      {
+        userId: "user_1",
+        platform: "CODEFORCES",
+        problemId: "1002-C",
+        name: "Unrated Problem",
+        tags: ["dp"],
+        rating: null,
+        solvedAt: "2026-03-31T23:40:00.000Z",
+        url: "https://codeforces.com/problemset/problem/1002/C",
+      },
+    ]
+  );
+});
+
+test("records failed accepted Codeforces submissions without storing invalid solved problems", async () => {
+  setCodeforcesFetchImplementation(async () =>
+    mockCodeforcesResponse({
+      status: "OK",
+      result: [
+        {
+          creationTimeSeconds: 1_775_000_100,
+          verdict: "OK",
+          problem: {
+            contestId: 1000,
+            index: "A",
+            name: "Watermelon",
+            tags: ["math"],
+            rating: 800,
+          },
+        },
+        {
+          creationTimeSeconds: 1_775_000_200,
+          verdict: "OK",
+          problem: {
+            contestId: 1001,
+            index: "B",
+            tags: ["implementation"],
+          },
+        },
+      ],
+    })
+  );
+
+  const result = await syncSolvedProblems("user_1", "tourist");
+
+  assert.deepEqual(result, {
+    processed: 1,
+    upserted: 1,
+    failed: 1,
+  });
+  assert.equal(solvedProblems.size, 1);
 });

@@ -3,6 +3,8 @@ const { AppError } = require("../utils/AppError");
 const { validateCodeforcesHandle } = require("../validators/codeforces.validator");
 
 const CODEFORCES_USER_INFO_URL = "https://codeforces.com/api/user.info";
+const CODEFORCES_RATING_HISTORY_URL = "https://codeforces.com/api/user.rating";
+const CODEFORCES_SUBMISSIONS_URL = "https://codeforces.com/api/user.status";
 const CODEFORCES_PLATFORM = "CODEFORCES";
 
 let fetchImplementation = (...args) => globalThis.fetch(...args);
@@ -70,19 +72,111 @@ function formatProfile(profile) {
   };
 }
 
-async function getUserCodeforcesAccount(userId) {
-  return prisma.contestAccount.findFirst({
-    where: {
-      userId,
-      platform: CODEFORCES_PLATFORM,
-    },
-    select: {
-      handle: true,
-    },
-  });
+function assertValidRatingUpdate(update) {
+  const hasValidRatingUpdate =
+    update &&
+    typeof update === "object" &&
+    Number.isFinite(update.ratingUpdateTimeSeconds) &&
+    Number.isFinite(update.newRating);
+
+  if (!hasValidRatingUpdate) {
+    throw new AppError(
+      "Codeforces returned an invalid rating history response",
+      502,
+      "CODEFORCES_INVALID_RESPONSE"
+    );
+  }
 }
 
-async function fetchCodeforcesProfile(handle) {
+function formatRatingSnapshot(userId, update, maxRating) {
+  assertValidRatingUpdate(update);
+
+  return {
+    userId,
+    platform: CODEFORCES_PLATFORM,
+    rating: update.newRating,
+    maxRating,
+    rank: null,
+    recordedAt: new Date(update.ratingUpdateTimeSeconds * 1000),
+  };
+}
+
+function buildProblemExternalId(problem) {
+  if (!problem || typeof problem !== "object") {
+    return null;
+  }
+
+  if (Number.isFinite(problem.contestId) && typeof problem.index === "string") {
+    return `${problem.contestId}-${problem.index}`;
+  }
+
+  if (typeof problem.problemsetName === "string" && typeof problem.index === "string") {
+    return `${problem.problemsetName}-${problem.index}`;
+  }
+
+  if (typeof problem.name === "string" && problem.name.trim().length > 0) {
+    return problem.name.trim();
+  }
+
+  return null;
+}
+
+function buildProblemUrl(problem) {
+  if (Number.isFinite(problem.contestId) && typeof problem.index === "string") {
+    return `https://codeforces.com/problemset/problem/${problem.contestId}/${encodeURIComponent(problem.index)}`;
+  }
+
+  return null;
+}
+
+function normalizeTags(tags) {
+  if (!Array.isArray(tags)) {
+    return [];
+  }
+
+  return tags.filter((tag) => typeof tag === "string" && tag.trim().length > 0);
+}
+
+function assertValidAcceptedSubmission(submission) {
+  const hasValidSubmission =
+    submission &&
+    typeof submission === "object" &&
+    submission.verdict === "OK" &&
+    Number.isFinite(submission.creationTimeSeconds) &&
+    submission.problem &&
+    typeof submission.problem === "object" &&
+    typeof submission.problem.name === "string" &&
+    buildProblemExternalId(submission.problem);
+
+  if (!hasValidSubmission) {
+    throw new AppError(
+      "Codeforces returned an invalid solved problem response",
+      502,
+      "CODEFORCES_INVALID_RESPONSE"
+    );
+  }
+}
+
+function formatSolvedProblem(userId, submission) {
+  assertValidAcceptedSubmission(submission);
+
+  const { problem } = submission;
+
+  return {
+    userId,
+    contestId: null,
+    platform: CODEFORCES_PLATFORM,
+    externalId: buildProblemExternalId(problem),
+    name: problem.name,
+    url: buildProblemUrl(problem),
+    tags: normalizeTags(problem.tags),
+    difficulty: null,
+    rating: normalizeNumber(problem.rating),
+    solvedAt: new Date(submission.creationTimeSeconds * 1000),
+  };
+}
+
+async function fetchCodeforcesPayload(url) {
   if (typeof fetchImplementation !== "function") {
     throw new AppError(
       "Codeforces API client is not available",
@@ -94,15 +188,12 @@ async function fetchCodeforcesProfile(handle) {
   let response;
 
   try {
-    response = await fetchImplementation(
-      `${CODEFORCES_USER_INFO_URL}?handles=${encodeURIComponent(handle)}`,
-      {
-        method: "GET",
-        headers: {
-          accept: "application/json",
-        },
-      }
-    );
+    response = await fetchImplementation(url, {
+      method: "GET",
+      headers: {
+        accept: "application/json",
+      },
+    });
   } catch (_error) {
     throw new AppError(
       "Unable to reach Codeforces API",
@@ -157,6 +248,26 @@ async function fetchCodeforcesProfile(handle) {
     );
   }
 
+  return payload;
+}
+
+async function getUserCodeforcesAccount(userId) {
+  return prisma.contestAccount.findFirst({
+    where: {
+      userId,
+      platform: CODEFORCES_PLATFORM,
+    },
+    select: {
+      handle: true,
+    },
+  });
+}
+
+async function fetchCodeforcesProfile(handle) {
+  const payload = await fetchCodeforcesPayload(
+    `${CODEFORCES_USER_INFO_URL}?handles=${encodeURIComponent(handle)}`
+  );
+
   const hasValidResult =
     payload.status === "OK" &&
     Array.isArray(payload.result) &&
@@ -171,6 +282,148 @@ async function fetchCodeforcesProfile(handle) {
   }
 
   return formatProfile(payload.result[0]);
+}
+
+async function fetchCodeforcesRatingHistory(handle) {
+  const payload = await fetchCodeforcesPayload(
+    `${CODEFORCES_RATING_HISTORY_URL}?handle=${encodeURIComponent(handle)}`
+  );
+
+  const hasValidResult = payload.status === "OK" && Array.isArray(payload.result);
+
+  if (!hasValidResult) {
+    throw new AppError(
+      "Codeforces returned an invalid rating history response",
+      502,
+      "CODEFORCES_INVALID_RESPONSE"
+    );
+  }
+
+  return payload.result;
+}
+
+async function fetchCodeforcesSubmissions(handle) {
+  const payload = await fetchCodeforcesPayload(
+    `${CODEFORCES_SUBMISSIONS_URL}?handle=${encodeURIComponent(handle)}`
+  );
+
+  const hasValidResult = payload.status === "OK" && Array.isArray(payload.result);
+
+  if (!hasValidResult) {
+    throw new AppError(
+      "Codeforces returned an invalid submissions response",
+      502,
+      "CODEFORCES_INVALID_RESPONSE"
+    );
+  }
+
+  return payload.result;
+}
+
+async function syncRatingHistory(userId, handle) {
+  const validHandle = validateCodeforcesHandle(handle);
+  const ratingHistory = await fetchCodeforcesRatingHistory(validHandle);
+  const sortedHistory = [...ratingHistory].sort(
+    (left, right) => left.ratingUpdateTimeSeconds - right.ratingUpdateTimeSeconds
+  );
+
+  const results = {
+    processed: 0,
+    upserted: 0,
+    failed: 0,
+  };
+  let maxRating = null;
+
+  for (const update of sortedHistory) {
+    try {
+      assertValidRatingUpdate(update);
+      maxRating =
+        maxRating === null ? update.newRating : Math.max(maxRating, update.newRating);
+
+      const snapshot = formatRatingSnapshot(userId, update, maxRating);
+
+      await prisma.ratingSnapshot.upsert({
+        where: {
+          userId_platform_recordedAt: {
+            userId: snapshot.userId,
+            platform: snapshot.platform,
+            recordedAt: snapshot.recordedAt,
+          },
+        },
+        update: {
+          rating: snapshot.rating,
+          maxRating: snapshot.maxRating,
+          rank: snapshot.rank,
+        },
+        create: snapshot,
+      });
+
+      results.processed += 1;
+      results.upserted += 1;
+    } catch (_error) {
+      results.failed += 1;
+    }
+  }
+
+  return results;
+}
+
+async function syncSolvedProblems(userId, handle) {
+  const validHandle = validateCodeforcesHandle(handle);
+  const submissions = await fetchCodeforcesSubmissions(validHandle);
+  const acceptedProblems = new Map();
+  const results = {
+    processed: 0,
+    upserted: 0,
+    failed: 0,
+  };
+
+  for (const submission of submissions) {
+    if (!submission || submission.verdict !== "OK") {
+      continue;
+    }
+
+    try {
+      const solvedProblem = formatSolvedProblem(userId, submission);
+      const existingProblem = acceptedProblems.get(solvedProblem.externalId);
+
+      if (!existingProblem || solvedProblem.solvedAt < existingProblem.solvedAt) {
+        acceptedProblems.set(solvedProblem.externalId, solvedProblem);
+      }
+    } catch (_error) {
+      results.failed += 1;
+    }
+  }
+
+  for (const solvedProblem of acceptedProblems.values()) {
+    try {
+      await prisma.solvedProblem.upsert({
+        where: {
+          userId_platform_externalId: {
+            userId: solvedProblem.userId,
+            platform: solvedProblem.platform,
+            externalId: solvedProblem.externalId,
+          },
+        },
+        update: {
+          name: solvedProblem.name,
+          url: solvedProblem.url,
+          tags: solvedProblem.tags,
+          difficulty: solvedProblem.difficulty,
+          rating: solvedProblem.rating,
+          solvedAt: solvedProblem.solvedAt,
+        },
+        create: solvedProblem,
+      });
+
+      results.processed += 1;
+      results.upserted += 1;
+    } catch (_error) {
+      results.failed += 1;
+    }
+  }
+
+  return results;
 }
 
 async function getCodeforcesProfileForUser(userId) {
@@ -191,9 +444,15 @@ async function getCodeforcesProfileForUser(userId) {
 
 module.exports = {
   CODEFORCES_PLATFORM,
+  CODEFORCES_RATING_HISTORY_URL,
+  CODEFORCES_SUBMISSIONS_URL,
   CODEFORCES_USER_INFO_URL,
   fetchCodeforcesProfile,
+  fetchCodeforcesRatingHistory,
+  fetchCodeforcesSubmissions,
   getCodeforcesProfileForUser,
   resetCodeforcesFetchImplementation,
   setCodeforcesFetchImplementation,
+  syncRatingHistory,
+  syncSolvedProblems,
 };

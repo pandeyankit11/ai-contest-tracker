@@ -6,6 +6,7 @@ const authRoutes = require("./routes/auth.routes");
 const codeforcesRoutes = require("./routes/codeforces.routes");
 const platformRoutes = require("./routes/platform.routes");
 const contestRoutes = require("./routes/contest.routes");
+const analyticsRoutes = require("./routes/analytics.routes");
 const {
   errorHandler,
   notFoundHandler,
@@ -54,6 +55,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/platforms", platformRoutes);
 app.use("/api/codeforces", codeforcesRoutes);
 app.use("/api/contests", contestRoutes);
+app.use("/api/analytics", analyticsRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

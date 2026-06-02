@@ -14,6 +14,7 @@ datasource db {
 enum Platform {
   CODEFORCES
   LEETCODE
+  CODECHEF
 }
 
 enum ContestPhase {
@@ -25,10 +26,13 @@ enum ContestPhase {
 }
 
 model User {
-  id              String           @id @default(cuid())
-  email           String           @unique
-  password        String
-  contestAccounts ContestAccount[]
+  id                    String                 @id @default(cuid())
+  email                 String                 @unique
+  password              String
+  contestAccounts       ContestAccount[]
+  ratingSnapshots       RatingSnapshot[]
+  solvedProblems        SolvedProblem[]
+  contestParticipations ContestParticipation[]
 
   createdAt DateTime @default(now())
 }
@@ -47,7 +51,7 @@ model ContestAccount {
 }
 
 model Contest {
-  id              String       @id @default(cuid())
+  id              String                 @id @default(cuid())
   externalId      Int
   platform        Platform
   name            String
@@ -55,11 +59,81 @@ model Contest {
   startTime       DateTime
   endTime         DateTime
   durationSeconds Int
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  solvedProblems  SolvedProblem[]
+  participations  ContestParticipation[]
 
   @@unique([platform, externalId])
   @@index([startTime])
   @@index([platform, startTime])
 }
 
+model RatingSnapshot {
+  id         String   @id @default(cuid())
+  userId     String
+  platform   Platform
+  rating     Int?
+  maxRating  Int?
+  rank       String?
+  recordedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, platform, recordedAt])
+  @@index([userId, platform, recordedAt])
+  @@index([platform, recordedAt])
+}
+
+model SolvedProblem {
+  id         String   @id @default(cuid())
+  userId     String
+  contestId  String?
+  platform   Platform
+  externalId String
+  name       String
+  url        String?
+  tags       String[] @default([])
+  difficulty String?
+  rating     Int?
+  solvedAt   DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contest Contest? @relation(fields: [contestId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, platform, externalId])
+  @@index([userId, platform, solvedAt])
+  @@index([platform, solvedAt])
+  @@index([contestId])
+  @@index([platform, difficulty])
+  @@index([platform, rating])
+}
+
+model ContestParticipation {
+  id                String   @id @default(cuid())
+  userId            String
+  contestId         String?
+  platform          Platform
+  externalContestId String
+  rank              Int?
+  oldRating         Int?
+  newRating         Int?
+  ratingChange      Int?
+  problemsSolved    Int      @default(0)
+  penalty           Int?
+  participatedAt    DateTime
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contest Contest? @relation(fields: [contestId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, platform, externalContestId])
+  @@index([userId, platform, participatedAt])
+  @@index([platform, participatedAt])
+  @@index([contestId])
+  @@index([userId, platform, ratingChange])
+}
