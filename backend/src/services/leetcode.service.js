@@ -483,7 +483,7 @@ async function fetchLeetCodeUpcomingContests() {
     return [];
   }
 
- return data.topTwoContests.map(c => ({
+  return data.topTwoContests.map(c => ({
     externalId: String(c.titleSlug), // <--- THE FIX: Wrapped in String()
     platform: 'LEETCODE', 
     name: c.title,
@@ -492,6 +492,7 @@ async function fetchLeetCodeUpcomingContests() {
     endTime: new Date((c.startTime + c.duration) * 1000),
     durationSeconds: c.duration,
   }));
+}
 
 async function syncLeetCodeContests() {
   console.log("[LEETCODE SERVICE] Starting LeetCode upcoming contests sync...");
