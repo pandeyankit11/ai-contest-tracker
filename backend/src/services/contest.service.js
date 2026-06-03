@@ -2,6 +2,10 @@ const { prisma } = require("../config/prisma");
 const { AppError } = require("../utils/AppError");
 const leetcodeService = require("./leetcode.service");
 
+// --- CACHE BUSTER ---
+// This line forces Git and Render to rebuild this exact file.
+console.log("[SYSTEM] contest.service.js initialized successfully. Enforcing String types.");
+
 const CODEFORCES_CONTESTS_URL = "https://codeforces.com/api/contest.list";
 const CODEFORCES_PLATFORM = "CODEFORCES";
 
