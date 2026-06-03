@@ -21,7 +21,9 @@ const Analytics = () => {
     solvedTrends: null,
   });
 
-  // Extract fetch logic so it can be called on mount and after syncing
+  // THE FIX: Define your backend URL so Vercel knows where to send the requests
+  const BASE_URL = import.meta.env.VITE_API_URL || 'https://ai-contest-tracker-v2.onrender.com';
+
   const fetchAnalytics = useCallback(async () => {
     try {
       setError(null);
@@ -30,13 +32,14 @@ const Analytics = () => {
         'Content-Type': 'application/json',
       };
 
+      // Added BASE_URL to all GET requests
       const [ratingRes, difficultyRes, topicRes, activityRes, trendsRes] =
         await Promise.all([
-          fetch('/api/analytics/rating-history', { headers }),
-          fetch('/api/analytics/difficulty-breakdown', { headers }),
-          fetch('/api/analytics/topic-breakdown', { headers }),
-          fetch('/api/analytics/activity', { headers }),
-          fetch('/api/analytics/solved-trends', { headers }),
+          fetch(`${BASE_URL}/api/analytics/rating-history`, { headers }),
+          fetch(`${BASE_URL}/api/analytics/difficulty-breakdown`, { headers }),
+          fetch(`${BASE_URL}/api/analytics/topic-breakdown`, { headers }),
+          fetch(`${BASE_URL}/api/analytics/activity`, { headers }),
+          fetch(`${BASE_URL}/api/analytics/solved-trends`, { headers }),
         ]);
 
       if (
@@ -79,10 +82,7 @@ const Analytics = () => {
     }
   }, [token, fetchAnalytics]);
 
-  // Handle manual data synchronization
   const handleSync = async () => {
-    console.log('DEBUG: handleSync fired, token present:', !!token);
-    
     if (!token) {
       setError('Not authenticated.');
       return;
@@ -92,10 +92,8 @@ const Analytics = () => {
     setError(null);
 
     try {
-      console.log('DEBUG: Attempting POST /api/analytics/sync');
-      
-      // Use the native global fetch explicitly
-      const response = await fetch('/api/analytics/sync', {
+      // Added BASE_URL to the POST request
+      const response = await fetch(`${BASE_URL}/api/analytics/sync`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -103,19 +101,14 @@ const Analytics = () => {
         },
       });
 
-      console.log('DEBUG: Response received:', response);
-
       if (!response.ok) {
         throw new Error(`Server returned ${response.status}`);
       }
 
       await fetchAnalytics();
-      console.log('DEBUG: Sync and re-fetch complete');
       
     } catch (err) {
-      // THIS IS THE MOST IMPORTANT PART
       console.error('CRITICAL ERROR CAUGHT:', err);
-      // If the error is a TypeError, it's usually a proxy/connection issue
       setError(`Sync failed: ${err.message}`);
     } finally {
       setSyncing(false);
@@ -152,7 +145,6 @@ const Analytics = () => {
             <p>Track your progress across all platforms</p>
           </div>
           
-          {/* THE NEW ANIMATED SYNC BUTTON */}
           <button 
             onClick={handleSync} 
             disabled={syncing}
@@ -161,7 +153,7 @@ const Analytics = () => {
               alignItems: 'center',
               justifyContent: 'center',
               gap: '10px',
-              minWidth: '130px', /* Prevents button jitter when text changes */
+              minWidth: '130px', 
               height: '40px',
               padding: '0 20px',
               opacity: syncing ? 0.7 : 1,
