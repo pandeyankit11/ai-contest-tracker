@@ -8,11 +8,15 @@ const Contests = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // THE FIX: Define your backend URL
+  const BASE_URL = import.meta.env.VITE_API_URL || 'https://ai-contest-tracker-v2.onrender.com';
+
   useEffect(() => {
     const fetchContests = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/contests/history', {
+        // THE FIX: Attach BASE_URL to the fetch call
+        const response = await fetch(`${BASE_URL}/api/contests/history`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',

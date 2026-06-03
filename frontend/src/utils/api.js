@@ -1,6 +1,7 @@
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const TOKEN_KEY = 'authToken';
 const USER_KEY = 'authUser';
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://ai-contest-tracker-v2.onrender.com';
 
 export function getStoredToken() {
   return localStorage.getItem(TOKEN_KEY);
