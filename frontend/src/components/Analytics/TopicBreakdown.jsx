@@ -1,3 +1,5 @@
+import './TopicBreakdown.css';
+
 const TopicBreakdown = ({ data }) => {
   if (!data || Object.keys(data).length === 0) {
     return (
@@ -19,13 +21,13 @@ const TopicBreakdown = ({ data }) => {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
-        {Object.entries(data).map(([platform, topics]) => {
-          // Sort topics by count and get top 8
-          const sortedTopics = Object.entries(topics)
-            .sort(([, countA], [, countB]) => countB - countA)
-            .slice(0, 8);
-
-          const maxCount = Math.max(...sortedTopics.map(([, count]) => count), 1);
+        {Object.entries(data).map(([platform, topicsArray]) => {
+          // The backend already sends a sorted array of objects [{topic, count}]
+          // Just slice the top 8 for display
+          const topTopics = topicsArray.slice(0, 8);
+          
+          // Find the max count for the progress bar scaling
+          const maxCount = Math.max(...topTopics.map((t) => t.count), 1);
 
           return (
             <div key={platform} className="topics-card">
@@ -34,7 +36,8 @@ const TopicBreakdown = ({ data }) => {
               </div>
 
               <div style={{ display: 'grid', gap: '8px' }}>
-                {sortedTopics.map(([topic, count]) => {
+                {/* Destructure topic and count directly from the object */}
+                {topTopics.map(({ topic, count }) => {
                   const percentage = (count / maxCount) * 100;
 
                   return (
@@ -90,9 +93,9 @@ const TopicBreakdown = ({ data }) => {
                 })}
               </div>
 
-              {Object.keys(topics).length > 8 && (
+              {topicsArray.length > 8 && (
                 <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--text-soft)' }}>
-                  +{Object.keys(topics).length - 8} more topics
+                  +{topicsArray.length - 8} more topics
                 </div>
               )}
             </div>

@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, Link, useNavigate } from 'react-router-dom'; // Make sure to import Link
 import { useAuth } from '../context/AuthContext';
 
 export const Header = () => {
@@ -21,10 +21,28 @@ export const Header = () => {
         <NavLink to="/dashboard">Dashboard</NavLink>
         <NavLink to="/accounts">Accounts</NavLink>
         <NavLink to="/contests">Contests</NavLink>
+        <NavLink to="/calendar">Calendar</NavLink>
+        <NavLink to="/history">History</NavLink>
+        <NavLink to="/analytics">Analytics</NavLink>
       </nav>
 
       <div className="user-menu">
-        <span title={user?.email}>{user?.email}</span>
+        {/* Changed this from a static span to a clickable Link */}
+        <Link 
+          to="/profile" 
+          title="Go to Profile"
+          style={{ 
+            color: '#9ca3af', 
+            textDecoration: 'none', 
+            fontWeight: '500',
+            transition: 'color 0.2s'
+          }}
+          onMouseEnter={(e) => e.target.style.color = '#f3f4f6'}
+          onMouseLeave={(e) => e.target.style.color = '#9ca3af'}
+        >
+          {user?.email}
+        </Link>
+
         <button type="button" onClick={handleLogout}>
           Logout
         </button>

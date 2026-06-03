@@ -13,16 +13,23 @@ const DifficultyBreakdown = ({ data }) => {
   }
 
   const getDifficultyColor = (difficulty) => {
+    const str = String(difficulty).toLowerCase();
     const colors = {
       easy: '#10b981',
       medium: '#f59e0b',
       hard: '#ef4444',
     };
-    return colors[difficulty] || '#9ca3af';
+    
+    // If it's a number (Codeforces rating), use a nice blue
+    if (!isNaN(str)) return '#3b82f6'; 
+    
+    return colors[str] || '#9ca3af';
   };
 
   const getDifficultyLabel = (difficulty) => {
-    return difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+    const str = String(difficulty);
+    if (!isNaN(str)) return str; // Return numerical ratings as-is
+    return str.charAt(0).toUpperCase() + str.slice(1);
   };
 
   return (
@@ -32,11 +39,9 @@ const DifficultyBreakdown = ({ data }) => {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
-        {Object.entries(data).map(([platform, difficulties]) => {
-          const total =
-            (difficulties.easy || 0) +
-            (difficulties.medium || 0) +
-            (difficulties.hard || 0);
+        {Object.entries(data).map(([platform, difficultiesArray]) => {
+          // The backend now sends an array: [{ name: '800', count: 10 }, ...]
+          const total = difficultiesArray.reduce((sum, item) => sum + item.count, 0);
 
           return (
             <div key={platform} className="difficulty-card">
@@ -45,15 +50,14 @@ const DifficultyBreakdown = ({ data }) => {
               </div>
 
               <div style={{ display: 'grid', gap: '8px' }}>
-                {['easy', 'medium', 'hard'].map((difficulty) => {
-                  const count = difficulties[difficulty] || 0;
+                {difficultiesArray.map(({ name, count }) => {
                   const percentage = total > 0 ? (count / total) * 100 : 0;
 
                   return (
-                    <div key={difficulty} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <div key={name} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                       <div style={{ minWidth: '50px' }}>
                         <span style={{ fontSize: '12px', color: 'var(--text-soft)' }}>
-                          {getDifficultyLabel(difficulty)}
+                          {getDifficultyLabel(name)}
                         </span>
                       </div>
                       <div
@@ -70,13 +74,13 @@ const DifficultyBreakdown = ({ data }) => {
                           style={{
                             height: '100%',
                             width: `${percentage}%`,
-                            background: getDifficultyColor(difficulty),
+                            background: getDifficultyColor(name),
                             transition: 'width 0.3s ease',
                           }}
                         />
                       </div>
                       <div style={{ minWidth: '40px', textAlign: 'right' }}>
-                        <strong style={{ fontSize: '14px', color: getDifficultyColor(difficulty) }}>
+                        <strong style={{ fontSize: '14px', color: getDifficultyColor(name) }}>
                           {count}
                         </strong>
                       </div>

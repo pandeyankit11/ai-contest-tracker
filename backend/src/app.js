@@ -16,6 +16,10 @@ const {
 const { env } = require("./config/env");
 
 const app = express();
+app.use((req, res, next) => {
+  console.log(`[GLOBAL] ${req.method} ${req.path}`);
+  next();
+});
 
 const allowedOrigins = [];
 

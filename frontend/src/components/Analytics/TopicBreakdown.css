@@ -1,0 +1,86 @@
+.chart-container h3 {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  color: #f9fafb;
+}
+
+.topic-analysis-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.platform-topics {
+  background: rgba(31, 41, 55, 0.3);
+  border: 1px solid #374151;
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.platform-title {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  color: #f3f4f6;
+  font-size: 1.1rem;
+  letter-spacing: 1px;
+}
+
+.topics-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.topic-bar-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.topic-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.topic-name {
+  color: #d1d5db;
+  text-transform: capitalize;
+}
+
+.topic-count {
+  color: #9ca3af;
+  font-weight: 600;
+}
+
+.topic-progress-bg {
+  width: 100%;
+  height: 8px;
+  background-color: #374151;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.topic-progress-fill {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Platform-specific gradient colors */
+.codeforces-fill {
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+}
+
+.leetcode-fill {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
+.empty-state {
+  color: #9ca3af;
+  padding: 2rem;
+  text-align: center;
+  background: rgba(31, 41, 55, 0.3);
+  border-radius: 8px;
+}

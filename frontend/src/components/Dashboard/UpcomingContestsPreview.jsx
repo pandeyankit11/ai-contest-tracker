@@ -32,6 +32,13 @@ function formatDuration(seconds) {
   return `${minutes}m`;
 }
 
+// NEW HELPER: Generates the correct URL based on platform and ID
+function getContestLink(platform, externalId) {
+  if (platform === 'LEETCODE') return `https://leetcode.com/contest/${externalId}`;
+  if (platform === 'CODEFORCES') return `https://codeforces.com/contest/${externalId}`;
+  return '#'; 
+}
+
 export const UpcomingContestsPreview = () => {
   const [contests, setContests] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -88,7 +95,17 @@ export const UpcomingContestsPreview = () => {
           {contests.map((contest) => (
             <li key={contest.id || `${contest.platform}-${contest.externalId}`}>
               <div>
-                <strong>{contest.name}</strong>
+                {/* NEW: Clickable Contest Name */}
+                <a 
+                  href={getContestLink(contest.platform, contest.externalId)} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  style={{ textDecoration: 'none', color: 'inherit' }}
+                >
+                  <strong style={{ cursor: 'pointer' }}>
+                    {contest.name} <span style={{ color: '#3b82f6', fontSize: '0.85em', marginLeft: '4px' }}>↗</span>
+                  </strong>
+                </a>
                 <span>
                   {contest.platform} - {formatDateTime(contest.startTime)}
                 </span>

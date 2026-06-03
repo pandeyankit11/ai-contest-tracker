@@ -1,5 +1,9 @@
 const { prisma } = require("../config/prisma");
-const { syncCodeforcesContests, getUpcomingContests } = require("../services/contest.service");
+const { 
+  syncCodeforcesContests, 
+  getUpcomingContests, 
+  getUserContestHistory // <-- ADDED IMPORT
+} = require("../services/contest.service");
 const { validateUpcomingContestsQuery } = require("../validators/contest.validator");
 const { asyncHandler } = require("../utils/asyncHandler");
 
@@ -34,8 +38,21 @@ const getUpcoming = asyncHandler(async (req, res) => {
   });
 });
 
+// --- NEW FUNCTION ADDED HERE ---
+const getContestHistory = asyncHandler(async (req, res) => {
+  // req.user.id is provided by the authenticate middleware
+  const data = await getUserContestHistory(req.user.id);
+
+  res.status(200).json({
+    success: true,
+    count: data.length,
+    data,
+  });
+});
+
 module.exports = {
   syncContests,
   getAllContests,
   getUpcoming,
+  getContestHistory, // <-- ADDED EXPORT
 };

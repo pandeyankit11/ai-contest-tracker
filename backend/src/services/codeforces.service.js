@@ -191,7 +191,9 @@ async function fetchCodeforcesPayload(url) {
     response = await fetchImplementation(url, {
       method: "GET",
       headers: {
-        accept: "application/json",
+        "accept": "application/json",
+        // CRITICAL: This bypasses the Codeforces Cloudflare bot block
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
       },
     });
   } catch (_error) {
@@ -368,6 +370,8 @@ async function syncRatingHistory(userId, handle) {
   return results;
 }
 
+// ... [Keep everything above syncSolvedProblems exactly the same] ...
+
 async function syncSolvedProblems(userId, handle) {
   const validHandle = validateCodeforcesHandle(handle);
   const submissions = await fetchCodeforcesSubmissions(validHandle);
@@ -426,6 +430,89 @@ async function syncSolvedProblems(userId, handle) {
   return results;
 }
 
+/**
+ * NEW HOOK: Sync individual contest details into ContestParticipation model
+ */
+async function syncContestParticipations(userId, handle) {
+  const validHandle = validateCodeforcesHandle(handle);
+  const ratingHistory = await fetchCodeforcesRatingHistory(validHandle);
+  
+  const results = {
+    processed: 0,
+    upserted: 0,
+    failed: 0
+  };
+
+  for (const update of ratingHistory) {
+    try {
+      assertValidRatingUpdate(update);
+      const participatedAt = new Date(update.ratingUpdateTimeSeconds * 1000);
+
+      await prisma.contestParticipation.upsert({
+        where: {
+          userId_platform_externalContestId: {
+            userId,
+            platform: CODEFORCES_PLATFORM,
+            externalContestId: update.contestId.toString(),
+          },
+        },
+        update: {
+          rank: update.rank,
+          oldRating: update.oldRating,
+          newRating: update.newRating,
+          ratingChange: update.newRating - update.oldRating,
+        },
+        create: {
+          userId,
+          platform: CODEFORCES_PLATFORM,
+          externalContestId: update.contestId.toString(),
+          rank: update.rank,
+          oldRating: update.oldRating,
+          newRating: update.newRating,
+          ratingChange: update.newRating - update.oldRating,
+          participatedAt,
+        },
+      });
+
+      results.processed += 1;
+      results.upserted += 1;
+    } catch (_error) {
+      results.failed += 1;
+    }
+  }
+
+  return results;
+}
+
+/**
+ * NEW HOOK: Unified coordination function used by the analytics sync endpoint
+ */
+async function syncAllUserData(userId) {
+  const account = await getUserCodeforcesAccount(userId);
+  if (!account) {
+    throw new AppError(
+      "Codeforces account not found for this user",
+      404,
+      "CODEFORCES_ACCOUNT_NOT_FOUND"
+    );
+  }
+
+  const handle = validateCodeforcesHandle(account.handle);
+
+  // Execute all sync tasks concurrently
+  const [ratingResults, solvedResults, participationResults] = await Promise.all([
+    syncRatingHistory(userId, handle),
+    syncSolvedProblems(userId, handle),
+    syncContestParticipations(userId, handle)
+  ]);
+
+  return {
+    ratingSnapshots: ratingResults,
+    solvedProblems: solvedResults,
+    contestParticipations: participationResults
+  };
+}
+
 async function getCodeforcesProfileForUser(userId) {
   const account = await getUserCodeforcesAccount(userId);
 
@@ -455,4 +542,6 @@ module.exports = {
   setCodeforcesFetchImplementation,
   syncRatingHistory,
   syncSolvedProblems,
+  syncContestParticipations, // Added export
+  syncAllUserData           // Added export
 };

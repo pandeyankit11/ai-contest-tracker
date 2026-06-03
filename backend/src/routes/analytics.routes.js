@@ -6,11 +6,13 @@ const {
   topicBreakdown,
   activity,
   solvedTrends,
+  syncAnalytics, // <-- Added this import
 } = require("../controllers/analytics.controller");
 const { authenticate } = require("../middleware/auth.middleware");
 
 const router = express.Router();
 
+// This middleware protects all routes below it
 router.use(authenticate);
 
 router.get("/rating-history", ratingHistory);
@@ -18,5 +20,8 @@ router.get("/difficulty-breakdown", difficultyBreakdown);
 router.get("/topic-breakdown", topicBreakdown);
 router.get("/activity", activity);
 router.get("/solved-trends", solvedTrends);
+
+// NEW: Add the POST route for syncing data
+router.post("/sync", syncAnalytics);
 
 module.exports = router;
