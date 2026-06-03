@@ -57,12 +57,15 @@ const syncAnalytics = asyncHandler(async (req, res) => {
   const errors = [];
 
   // 1. Sync User Analytics
+  // 1. Sync User Analytics
   for (const account of accounts) {
     console.log(`[CONTROLLER] -> Processing platform: ${account.platform} (Handle: ${account.handle})`);
     try {
       if (account.platform === "CODEFORCES") {
-        console.log(`[CONTROLLER] Bypassing Codeforces sync temporarily...`);
-        continue; 
+        console.log(`[CONTROLLER] Calling Codeforces analytics sync...`);
+        // Calls the sync function we imported from codeforces.service
+        results.CODEFORCES = await syncAllUserData(userId); 
+        console.log(`[CONTROLLER] Codeforces analytics sync SUCCESS.`);
       } else if (account.platform === "LEETCODE") {
         console.log(`[CONTROLLER] Calling LeetCode analytics sync...`);
         results.LEETCODE = await syncLeetCodeAnalytics(userId, account.handle);
