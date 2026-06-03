@@ -1,9 +1,12 @@
 const { prisma } = require("../config/prisma");
 
+// CACHE BUSTER
+console.log("[SYSTEM] analytics.service.js initialized. Null-safe charts active.");
+
 async function getRatingHistory(userId) {
   const snapshots = await prisma.ratingSnapshot.findMany({
     where: { userId },
-    orderBy: [{ recordedAt: "asc" }], // Charts flow left-to-right, so sort oldest to newest
+    orderBy: [{ recordedAt: "asc" }],
     select: {
       platform: true,
       rating: true,
@@ -15,18 +18,23 @@ async function getRatingHistory(userId) {
   const groupedByPlatform = {};
 
   snapshots.forEach((snapshot) => {
+    if (!snapshot || !snapshot.recordedAt) return; // Prevent date crashes
+
     if (!groupedByPlatform[snapshot.platform]) {
       groupedByPlatform[snapshot.platform] = { history: [], latestRating: null, maxRating: 0 };
     }
     
-    groupedByPlatform[snapshot.platform].history.push({
-      date: snapshot.recordedAt.toISOString().split("T")[0],
-      rating: snapshot.rating,
-      maxRating: snapshot.maxRating,
-    });
+    try {
+      groupedByPlatform[snapshot.platform].history.push({
+        date: snapshot.recordedAt.toISOString().split("T")[0],
+        rating: snapshot.rating || 0,
+        maxRating: snapshot.maxRating || 0,
+      });
+    } catch (err) {
+      console.warn(`[ANALYTICS] Invalid date on rating snapshot:`, err.message);
+    }
   });
 
-  // Calculate the latest and max ratings
   Object.keys(groupedByPlatform).forEach((platform) => {
     const history = groupedByPlatform[platform].history;
     groupedByPlatform[platform].latestRating = history[history.length - 1]?.rating || null;
@@ -49,22 +57,19 @@ async function getDifficultyBreakdown(userId) {
 
   const result = {};
 
-  // 1. Process LeetCode Stats (Lifetime Aggregates)
-  // We use the new PlatformStats table which contains your correct 142 count
   stats.forEach((stat) => {
+    if (!stat) return;
     result[stat.platform] = [
-      { name: 'easy', count: stat.easy },
-      { name: 'medium', count: stat.medium },
-      { name: 'hard', count: stat.hard },
+      { name: 'easy', count: stat.easy || 0 },
+      { name: 'medium', count: stat.medium || 0 },
+      { name: 'hard', count: stat.hard || 0 },
     ];
   });
 
-  // 2. Process other platforms (e.g., Codeforces) from SolvedProblem
-  // We use a temporary object to group these ratings before converting to array
   const tempGroups = {};
 
   problems.forEach((problem) => {
-    // Skip LeetCode if we already have aggregate stats for it
+    if (!problem) return;
     if (problem.platform === "LEETCODE" && result["LEETCODE"]) return;
 
     if (!tempGroups[problem.platform]) {
@@ -72,9 +77,11 @@ async function getDifficultyBreakdown(userId) {
     }
 
     let diffKey = "unknown";
-    if (problem.platform === "CODEFORCES" && problem.rating) {
+    
+    // SAFE FALLBACKS FOR DIFFICULTY
+    if (problem.platform === "CODEFORCES" && problem.rating != null) {
       diffKey = problem.rating.toString();
-    } else if (problem.difficulty) {
+    } else if (problem.difficulty && typeof problem.difficulty === 'string') {
       diffKey = problem.difficulty.toLowerCase();
     }
 
@@ -84,7 +91,6 @@ async function getDifficultyBreakdown(userId) {
     tempGroups[problem.platform][diffKey] += 1;
   });
 
-  // 3. Convert tempGroups to chart-friendly arrays and add to result
   Object.entries(tempGroups).forEach(([platform, counts]) => {
     result[platform] = Object.entries(counts)
       .map(([name, count]) => ({ name, count }))
@@ -96,6 +102,7 @@ async function getDifficultyBreakdown(userId) {
 
   return result;
 }
+
 async function getTopicBreakdown(userId) {
   const problems = await prisma.solvedProblem.findMany({
     where: { userId },
@@ -105,16 +112,18 @@ async function getTopicBreakdown(userId) {
   const groupedByPlatform = {};
 
   problems.forEach((problem) => {
+    if (!problem) return;
     if (!groupedByPlatform[problem.platform]) groupedByPlatform[problem.platform] = {};
 
     if (Array.isArray(problem.tags)) {
       problem.tags.forEach((tag) => {
-        groupedByPlatform[problem.platform][tag] = (groupedByPlatform[problem.platform][tag] || 0) + 1;
+        if (typeof tag === 'string') {
+          groupedByPlatform[problem.platform][tag] = (groupedByPlatform[problem.platform][tag] || 0) + 1;
+        }
       });
     }
   });
 
-  // Convert to sorted arrays and take Top 15 topics so charts don't overflow
   const result = {};
   Object.entries(groupedByPlatform).forEach(([platform, tags]) => {
     result[platform] = Object.entries(tags)
@@ -136,13 +145,18 @@ async function getActivity(userId) {
   const groupedByPlatform = {};
 
   problems.forEach((problem) => {
+    if (!problem || !problem.solvedAt) return; // Prevent date crash
+
     if (!groupedByPlatform[problem.platform]) groupedByPlatform[problem.platform] = {};
 
-    const dateKey = problem.solvedAt.toISOString().split("T")[0];
-    groupedByPlatform[problem.platform][dateKey] = (groupedByPlatform[problem.platform][dateKey] || 0) + 1;
+    try {
+      const dateKey = problem.solvedAt.toISOString().split("T")[0];
+      groupedByPlatform[problem.platform][dateKey] = (groupedByPlatform[problem.platform][dateKey] || 0) + 1;
+    } catch (err) {
+      console.warn(`[ANALYTICS] Invalid date on activity map:`, err.message);
+    }
   });
 
-  // Convert to array format for heatmaps [{ date: '2023-01-01', count: 5 }]
   const result = {};
   Object.entries(groupedByPlatform).forEach(([platform, dates]) => {
     result[platform] = Object.entries(dates).map(([date, count]) => ({ date, count }));
@@ -152,7 +166,6 @@ async function getActivity(userId) {
 }
 
 async function getSolvedTrends(userId) {
-  // Fetch both individual problems and the total stats concurrently
   const [problems, stats] = await Promise.all([
     prisma.solvedProblem.findMany({
       where: { userId },
@@ -168,13 +181,11 @@ async function getSolvedTrends(userId) {
   const cumulativeCounts = {};
   const platformOffsets = {};
 
-  // 1. Calculate the starting offset for platforms like LeetCode
   stats.forEach(stat => {
-    const totalAggregate = stat.easy + stat.medium + stat.hard;
-    // Count how many individual problems we actually have stored with dates
-    const storedProblemsCount = problems.filter(p => p.platform === stat.platform).length;
+    if (!stat) return;
+    const totalAggregate = (stat.easy || 0) + (stat.medium || 0) + (stat.hard || 0);
+    const storedProblemsCount = problems.filter(p => p && p.platform === stat.platform).length;
     
-    // If the true total is higher than our stored count, that difference is our starting line!
     if (totalAggregate > storedProblemsCount) {
       platformOffsets[stat.platform] = totalAggregate - storedProblemsCount;
     } else {
@@ -182,22 +193,23 @@ async function getSolvedTrends(userId) {
     }
   });
 
-  // 2. Build the trendline starting from the offset instead of 0
   problems.forEach((problem) => {
+    if (!problem || !problem.solvedAt) return; // Prevent date crash
+
     if (!groupedByPlatform[problem.platform]) {
       groupedByPlatform[problem.platform] = new Map();
-      // Initialize with the calculated offset (e.g., 122) instead of 0
       cumulativeCounts[problem.platform] = platformOffsets[problem.platform] || 0;
     }
 
-    const dateKey = problem.solvedAt.toISOString().split("T")[0];
-    cumulativeCounts[problem.platform] += 1; // Increment by 1 for each problem
-    
-    // Always overwrite the date key with the latest cumulative count for that day
-    groupedByPlatform[problem.platform].set(dateKey, cumulativeCounts[problem.platform]);
+    try {
+      const dateKey = problem.solvedAt.toISOString().split("T")[0];
+      cumulativeCounts[problem.platform] += 1; 
+      groupedByPlatform[problem.platform].set(dateKey, cumulativeCounts[problem.platform]);
+    } catch (err) {
+      console.warn(`[ANALYTICS] Invalid date on trends map:`, err.message);
+    }
   });
 
-  // 3. Convert Map back to array format for the frontend chart
   const result = {};
   Object.entries(groupedByPlatform).forEach(([platform, dateMap]) => {
     result[platform] = Array.from(dateMap.entries()).map(([date, count]) => ({ date, count }));
