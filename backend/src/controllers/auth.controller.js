@@ -61,8 +61,20 @@ const me = asyncHandler(async (req, res) => {
   }
 });
 
+// --- NEW: Function to get total registered users ---
+const getTotalUsers = asyncHandler(async (req, res) => {
+  // prisma.user.count() is extremely fast and literally just counts the rows
+  const userCount = await prisma.user.count();
+  
+  res.status(200).json({
+    success: true,
+    totalUsers: userCount,
+  });
+});
+
 module.exports = {
   login,
   me,
   register,
+  getTotalUsers, 
 };
