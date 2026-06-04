@@ -36,30 +36,47 @@ export const Dashboard = () => {
   return (
     <>
       <Header />
-      <main className="page-shell dashboard-shell">
+      {/* Added position: 'relative' to lock the absolute badge to this container */}
+      <main className="page-shell dashboard-shell" style={{ position: 'relative', paddingTop: '40px' }}>
         
-        {/* --- THE FIX: Dedicated row for the badge, pushed to the far right --- */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            padding: '6px 14px',
-            borderRadius: '20px',
+        {/* --- THE GLAMOROUS BADGE --- */}
+        <div style={{
+          position: 'absolute',
+          top: '0px',     // Pushes it right below the navigation header
+          right: '0px',   // Aligns it perfectly to the right side
+          background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.1), rgba(59, 130, 246, 0.1))',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(168, 85, 247, 0.4)',
+          boxShadow: '0 4px 20px rgba(168, 85, 247, 0.2), inset 0 0 12px rgba(255, 255, 255, 0.05)',
+          padding: '8px 20px',
+          borderRadius: '30px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          zIndex: 10
+        }}>
+          {/* Double-glowing neon green dot */}
+          <span style={{ 
+            width: '8px', 
+            height: '8px', 
+            borderRadius: '50%', 
+            background: '#10b981', 
+            boxShadow: '0 0 8px #10b981, 0 0 16px #10b981' 
+          }}></span>
+          
+          <span style={{
+            color: '#e2e8f0',
             fontSize: '0.9rem',
-            color: '#a1a1aa',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
+            fontWeight: '600',
+            letterSpacing: '0.5px'
           }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }}></span>
-            Active users : <span style={{ color: '#fff', fontWeight: 'bold' }}>{activeUsers}</span>
-          </div>
+            ACTIVE USERS : <span style={{ color: '#fff', fontSize: '1.05rem', marginLeft: '4px' }}>{activeUsers}</span>
+          </span>
         </div>
 
-        {/* --- HeaderInfo is freed from Flexbox and restored to full width! --- */}
         <HeaderInfo />
 
-        <section className="dashboard-grid" aria-label="Dashboard summary">
+        <section className="dashboard-grid" aria-label="Dashboard summary" style={{ marginTop: '24px' }}>
           <CodeforcesCard />
           <LinkedAccountsSummary />
           <UpcomingContestsPreview />
