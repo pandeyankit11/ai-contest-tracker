@@ -109,7 +109,7 @@ export const LinkedAccountsSummary = () => {
 
   if (isLoading) {
     return (
-      <article className="dashboard-card" aria-live="polite">
+      <article className="dashboard-card" style={{ height: '100%', display: 'flex', flexDirection: 'column' }} aria-live="polite">
         <p className="eyebrow">Linked accounts</p>
         <div className="skeleton skeleton-title" />
         <div className="skeleton skeleton-row" />
@@ -122,12 +122,13 @@ export const LinkedAccountsSummary = () => {
     <>
       <HoverBorderStyles />
 
-      {/* Gradient uses all three platform colors so it "belongs" to both */}
+      {/* THE FIX: Added style={{ height: '100%', display: 'flex', flexDirection: 'column' }} */}
       <HoverBorderCard
         gradientFrom="#1a47c8"
         via="#f5a623"
         gradientTo="#c0392b"
         className="dashboard-card linked-summary-card"
+        style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
       >
         <div className="card-heading">
           <div>
@@ -138,12 +139,12 @@ export const LinkedAccountsSummary = () => {
         </div>
 
         {error ? (
-          <div className="card-error" role="alert">
+          <div className="card-error" role="alert" style={{ marginTop: 'auto' }}>
             <p>{error}</p>
             <button type="button" onClick={loadAccounts}>Retry</button>
           </div>
         ) : (
-          <ul className="account-list">
+          <ul className="account-list" style={{ marginTop: 'auto', marginBottom: 'auto' }}>
             <AnimatePresence initial={false}>
               {PLATFORMS.map((platform, i) => (
                 <motion.div

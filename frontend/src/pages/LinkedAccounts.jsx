@@ -131,7 +131,12 @@ export const LinkedAccounts = () => {
         )}
 
         <section className="accounts-layout">
-          <form className="account-form panel-section accent-panel" onSubmit={handleSubmit}>
+          {/* THE FIX: Added style={{ marginBottom: '24px' }} right here to create the perfect gap */}
+          <form 
+            className="account-form panel-section accent-panel" 
+            onSubmit={handleSubmit}
+            style={{ marginBottom: '24px' }}
+          >
             <p className="eyebrow">New connection</p>
             <h2>Add account</h2>
 
