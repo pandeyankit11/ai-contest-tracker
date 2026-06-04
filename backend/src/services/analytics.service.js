@@ -108,7 +108,6 @@ async function getTopicBreakdown(userId) {
     select: { platform: true, tags: true, externalId: true }, 
   });
 
-  // --- THE UI FIX: Pre-fill platforms so the UI card never vanishes ---
   const groupedByPlatform = {
     CODEFORCES: {},
     LEETCODE: {} 
@@ -120,8 +119,6 @@ async function getTopicBreakdown(userId) {
     if (!problem) return;
     
     if (problem.platform === 'LEETCODE') {
-      // If we have the magic aggregator, use it and ignore normal ones. 
-      // If we DON'T have it yet, fall back to normal counting.
       if (hasLCAggregator && problem.externalId !== 'lc-topics-aggregator') return;
     }
 
@@ -159,7 +156,8 @@ async function getActivity(userId) {
   problems.forEach((problem) => {
     if (!problem || !problem.solvedAt) return; 
     
-    // --- EXCLUDE THE AGGREGATOR FROM THE HEATMAP ---
+    // Explicitly exclude the aggregator, but KEEP the historical blocks 
+    // so the heatmap accurately reflects total submission intensity!
     if (problem.externalId === 'lc-topics-aggregator') return;
 
     if (!groupedByPlatform[problem.platform]) groupedByPlatform[problem.platform] = {};
@@ -194,14 +192,23 @@ async function getSolvedTrends(userId) {
   const cumulativeCounts = {};
   const platformOffsets = {};
 
-  // --- EXCLUDE THE AGGREGATOR FROM THE TRENDS CHART ---
-  const validProblems = problems.filter(p => p && p.externalId !== 'lc-topics-aggregator');
+  // --- THE FIX: Exclude the Aggregator AND Historical Submission Blocks ---
+  // This ensures the math relies strictly on your true total (144) 
+  // and only draws the validated unique problems on top of it.
+  const validProblems = problems.filter(p => {
+    if (!p) return false;
+    if (p.externalId === 'lc-topics-aggregator') return false;
+    if (p.externalId && p.externalId.startsWith('lc-historical-')) return false;
+    return true;
+  });
 
   stats.forEach(stat => {
     if (!stat) return;
     
     const totalInDB = validProblems.filter(p => p.platform === stat.platform).length;
     const totalWithDates = validProblems.filter(p => p.platform === stat.platform && p.solvedAt).length;
+    
+    // We trust the true total from stats (e.g., 144) over the DB rows
     const totalAggregate = stat.totalSolved || ((stat.easy || 0) + (stat.medium || 0) + (stat.hard || 0)) || totalInDB;
     
     if (totalAggregate > totalWithDates) {
