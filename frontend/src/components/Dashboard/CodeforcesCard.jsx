@@ -151,7 +151,7 @@ export const CodeforcesCard = () => {
         </div>
 
         {error ? (
-          <div className="card-error" role="alert">
+          <div className="card-error" role="alert" style={{ marginTop: 'auto' }}>
             <p>{error}</p>
             <button type="button" onClick={loadProfile}>Retry</button>
           </div>
@@ -200,6 +200,7 @@ export function HoverBorderStyles() {
       .hb-wrapper {
         position: relative;
         border-radius: 14px;
+        height: 100%; 
         /* NO background here — the inner card provides its own */
       }
 
@@ -232,6 +233,9 @@ export function HoverBorderStyles() {
         margin: 2px;
         /* Must set a solid background so gradient doesn't bleed through */
         background: var(--card-bg, #12141c);
+        height: calc(100% - 4px); 
+        display: flex;
+        flex-direction: column;
       }
 
       /* ── Rank badge ─────────────────────────────────────────────────── */
