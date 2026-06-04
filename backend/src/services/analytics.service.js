@@ -78,9 +78,9 @@ async function getDifficultyBreakdown(userId) {
 
     let diffKey = "unknown";
     
-    // SAFE FALLBACKS FOR DIFFICULTY
-    if (problem.platform === "CODEFORCES" && problem.rating != null) {
-      diffKey = problem.rating.toString();
+    // --- THE FIX 1: Explicitly handle unrated Codeforces problems ---
+    if (problem.platform === "CODEFORCES") {
+      diffKey = problem.rating ? problem.rating.toString() : "Unrated";
     } else if (problem.difficulty && typeof problem.difficulty === 'string') {
       diffKey = problem.difficulty.toLowerCase();
     }
@@ -95,6 +95,9 @@ async function getDifficultyBreakdown(userId) {
     result[platform] = Object.entries(counts)
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => {
+        // Keep sorting numerical ratings, but push "Unrated" to the end
+        if (a.name === "Unrated") return 1;
+        if (b.name === "Unrated") return -1;
         if (!isNaN(a.name) && !isNaN(b.name)) return Number(a.name) - Number(b.name);
         return 0;
       });
@@ -181,23 +184,32 @@ async function getSolvedTrends(userId) {
   const cumulativeCounts = {};
   const platformOffsets = {};
 
+  // --- THE FIX 2: Calculate missing dates into the baseline offset ---
   stats.forEach(stat => {
     if (!stat) return;
-    const totalAggregate = (stat.easy || 0) + (stat.medium || 0) + (stat.hard || 0);
-    const storedProblemsCount = problems.filter(p => p && p.platform === stat.platform).length;
     
-    if (totalAggregate > storedProblemsCount) {
-      platformOffsets[stat.platform] = totalAggregate - storedProblemsCount;
+    // Count ALL problems in the DB, even the 3 without dates
+    const totalInDB = problems.filter(p => p && p.platform === stat.platform).length;
+    // Count ONLY the problems that can actually be drawn on the chart
+    const totalWithDates = problems.filter(p => p && p.platform === stat.platform && p.solvedAt).length;
+    
+    // Use true total from stats if available, otherwise trust the DB total
+    const totalAggregate = stat.totalSolved || ((stat.easy || 0) + (stat.medium || 0) + (stat.hard || 0)) || totalInDB;
+    
+    // The offset becomes the difference. (e.g. 97 total - 94 with dates = 3 baseline offset)
+    if (totalAggregate > totalWithDates) {
+      platformOffsets[stat.platform] = totalAggregate - totalWithDates;
     } else {
       platformOffsets[stat.platform] = 0;
     }
   });
 
   problems.forEach((problem) => {
-    if (!problem || !problem.solvedAt) return; // Prevent date crash
+    if (!problem || !problem.solvedAt) return; 
 
     if (!groupedByPlatform[problem.platform]) {
       groupedByPlatform[problem.platform] = new Map();
+      // Initialize the count with our calculated offset (e.g. starts at 3 instead of 0)
       cumulativeCounts[problem.platform] = platformOffsets[problem.platform] || 0;
     }
 
