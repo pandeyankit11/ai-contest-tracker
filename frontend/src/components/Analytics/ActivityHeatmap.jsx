@@ -3,7 +3,6 @@ import { useState, useMemo } from 'react';
 const ActivityHeatmap = ({ data }) => {
   const [tooltip, setTooltip] = useState({ show: false, date: '', count: 0, x: 0, y: 0, color: '' });
   
-  // --- NEW: Calculate available years based on the user's data ---
   const availableYears = useMemo(() => {
     if (!data) return [new Date().getFullYear()];
     const years = new Set();
@@ -12,12 +11,10 @@ const ActivityHeatmap = ({ data }) => {
         if (d.date) years.add(new Date(d.date).getFullYear());
       });
     });
-    // If empty, fallback to this year
     if (years.size === 0) return [new Date().getFullYear()];
-    return Array.from(years).sort((a, b) => b - a); // Sort newest to oldest
+    return Array.from(years).sort((a, b) => b - a);
   }, [data]);
 
-  // --- NEW: State to track the currently selected year ---
   const [selectedYear, setSelectedYear] = useState(availableYears[0]);
 
   if (!data || Object.keys(data).length === 0) {
@@ -39,9 +36,11 @@ const ActivityHeatmap = ({ data }) => {
     return `rgba(37, 99, 235, ${intensity})`; 
   };
 
+  // Helper array for month names
+  const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
   return (
     <div>
-      {/* --- NEW: Header now includes the Year Dropdown --- */}
       <div className="card-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2>Activity Heatmap</h2>
         
@@ -72,13 +71,9 @@ const ActivityHeatmap = ({ data }) => {
           const maxCount = Math.max(...datesArray.map((d) => d.count), 1);
           const dateMap = new Map(datesArray.map((d) => [d.date, d.count]));
 
-          // --- NEW: Timeline strictly bound to the selected year ---
-          // Find the nearest Sunday before Jan 1st of the selected year
           const firstDate = new Date(selectedYear, 0, 1); 
           firstDate.setDate(firstDate.getDate() - firstDate.getDay());
 
-          // Find the nearest Saturday after Dec 31st of the selected year
-          // If the selected year is the CURRENT year, stop at today so it doesn't draw empty future boxes
           const today = new Date();
           let lastDate = selectedYear === today.getFullYear() ? new Date() : new Date(selectedYear, 11, 31);
           lastDate.setDate(lastDate.getDate() + (6 - lastDate.getDay()));
@@ -90,13 +85,34 @@ const ActivityHeatmap = ({ data }) => {
             current.setDate(current.getDate() + 1);
           }
 
+          // --- NEW: Calculate exact X-axis positions for month labels ---
+          const monthLabels = [];
+          let lastMonth = -1;
+          
+          timeline.forEach((dateStr, index) => {
+            // Split string to avoid timezone shifting issues
+            const monthIndex = parseInt(dateStr.split('-')[1], 10) - 1;
+            
+            if (monthIndex !== lastMonth) {
+              const colIndex = Math.floor(index / 7);
+              monthLabels.push({
+                label: MONTH_NAMES[monthIndex],
+                colIndex: colIndex
+              });
+              lastMonth = monthIndex;
+            }
+          });
+
           return (
             <div key={platform} className="heatmap-card">
               <div style={{ marginBottom: '12px' }}>
                 <strong style={{ color: 'var(--text-h)' }}>{platform}</strong>
               </div>
 
-              <div style={{ overflowX: 'auto', paddingBottom: '12px' }}>
+              {/* Scrollable wrapper */}
+              <div style={{ overflowX: 'auto', paddingBottom: '4px' }}>
+                
+                {/* 1. The Heatmap Grid */}
                 <div
                   style={{
                     display: 'grid',
@@ -144,6 +160,33 @@ const ActivityHeatmap = ({ data }) => {
                     );
                   })}
                 </div>
+
+                {/* --- NEW: 2. The Month Labels X-Axis --- */}
+                <div 
+                  style={{ 
+                    position: 'relative', 
+                    height: '20px', 
+                    marginTop: '8px',
+                    // Total width ensures the container scrolls alongside the grid perfectly
+                    minWidth: `${Math.ceil(timeline.length / 7) * 18}px` 
+                  }}
+                >
+                  {monthLabels.map((month, idx) => (
+                    <span 
+                      key={`month-${idx}`} 
+                      style={{ 
+                        position: 'absolute', 
+                        // 14px box width + 4px gap = 18px per column
+                        left: `${month.colIndex * 18}px`, 
+                        fontSize: '11px', 
+                        color: 'var(--text-soft, rgba(148, 163, 184, 0.8))'
+                      }}
+                    >
+                      {month.label}
+                    </span>
+                  ))}
+                </div>
+
               </div>
 
               {/* Legend */}
