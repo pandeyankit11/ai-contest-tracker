@@ -21,14 +21,19 @@ const Profile = () => {
   });
 
   // Whenever the user object loads or updates, extract the stats instantly
+  // Whenever the user object loads or updates, extract the stats instantly
   useEffect(() => {
     if (user) {
       setUsername(user.username || "Ankit");
 
-      // 1. Extract Codeforces Ratings from the Prisma ratingSnapshots array
-      const cfSnapshot = user.ratingSnapshots?.find(s => s.platform === 'CODEFORCES');
-      const cfRating = cfSnapshot?.rating || 0;
-      const cfMaxRating = cfSnapshot?.maxRating || 0;
+      // 1. Extract Codeforces Ratings (Sorted to get the LATEST rating)
+      const cfSnapshots = user.ratingSnapshots
+        ?.filter(s => s.platform === 'CODEFORCES')
+        ?.sort((a, b) => new Date(b.recordedAt) - new Date(a.recordedAt)); // Sort newest to oldest
+      
+      const latestCfSnapshot = cfSnapshots?.[0]; // Grab the top one
+      const cfRating = latestCfSnapshot?.rating || 0;
+      const cfMaxRating = latestCfSnapshot?.maxRating || 0;
 
       // 2. Extract LeetCode Solved (Easy + Medium + Hard from platformStats)
       const lcStats = user.platformStats?.find(s => s.platform === 'LEETCODE');
@@ -44,9 +49,9 @@ const Profile = () => {
         cfRating,
         cfMaxRating,
         lcSolved,
-        lcRecentContests: 0, // Set up later when contest participations are fetched
+        lcRecentContests: 0, 
         globalProblems,
-        globalContests: 0    // Set up later when contest participations are fetched
+        globalContests: 0    
       });
     }
   }, [user]);
