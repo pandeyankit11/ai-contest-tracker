@@ -78,7 +78,6 @@ async function getDifficultyBreakdown(userId) {
 
     let diffKey = "unknown";
     
-    // --- THE FIX 1: Explicitly handle unrated Codeforces problems ---
     if (problem.platform === "CODEFORCES") {
       diffKey = problem.rating ? problem.rating.toString() : "Unrated";
     } else if (problem.difficulty && typeof problem.difficulty === 'string') {
@@ -95,7 +94,6 @@ async function getDifficultyBreakdown(userId) {
     result[platform] = Object.entries(counts)
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => {
-        // Keep sorting numerical ratings, but push "Unrated" to the end
         if (a.name === "Unrated") return 1;
         if (b.name === "Unrated") return -1;
         if (!isNaN(a.name) && !isNaN(b.name)) return Number(a.name) - Number(b.name);
@@ -109,13 +107,19 @@ async function getDifficultyBreakdown(userId) {
 async function getTopicBreakdown(userId) {
   const problems = await prisma.solvedProblem.findMany({
     where: { userId },
-    select: { platform: true, tags: true },
+    select: { platform: true, tags: true, externalId: true }, // --- THE FIX 3: Select the external ID! ---
   });
 
   const groupedByPlatform = {};
 
   problems.forEach((problem) => {
     if (!problem) return;
+    
+    // --- THE FIX 4: Ignore normal LeetCode problems so we don't double count. ONLY read the magic aggregator! ---
+    if (problem.platform === 'LEETCODE' && problem.externalId !== 'lc-topics-aggregator') {
+      return; 
+    }
+
     if (!groupedByPlatform[problem.platform]) groupedByPlatform[problem.platform] = {};
 
     if (Array.isArray(problem.tags)) {
@@ -184,19 +188,13 @@ async function getSolvedTrends(userId) {
   const cumulativeCounts = {};
   const platformOffsets = {};
 
-  // --- THE FIX 2: Calculate missing dates into the baseline offset ---
   stats.forEach(stat => {
     if (!stat) return;
     
-    // Count ALL problems in the DB, even the 3 without dates
     const totalInDB = problems.filter(p => p && p.platform === stat.platform).length;
-    // Count ONLY the problems that can actually be drawn on the chart
     const totalWithDates = problems.filter(p => p && p.platform === stat.platform && p.solvedAt).length;
-    
-    // Use true total from stats if available, otherwise trust the DB total
     const totalAggregate = stat.totalSolved || ((stat.easy || 0) + (stat.medium || 0) + (stat.hard || 0)) || totalInDB;
     
-    // The offset becomes the difference. (e.g. 97 total - 94 with dates = 3 baseline offset)
     if (totalAggregate > totalWithDates) {
       platformOffsets[stat.platform] = totalAggregate - totalWithDates;
     } else {
@@ -209,7 +207,6 @@ async function getSolvedTrends(userId) {
 
     if (!groupedByPlatform[problem.platform]) {
       groupedByPlatform[problem.platform] = new Map();
-      // Initialize the count with our calculated offset (e.g. starts at 3 instead of 0)
       cumulativeCounts[problem.platform] = platformOffsets[problem.platform] || 0;
     }
 
