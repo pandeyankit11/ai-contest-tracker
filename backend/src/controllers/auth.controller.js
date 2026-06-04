@@ -6,7 +6,8 @@ const { loginUser, registerUser } = require("../services/auth.service");
 const { asyncHandler } = require("../utils/asyncHandler");
 
 // THE FIX: Pointing exactly to where your prisma.js file lives
-const prisma = require("../../prisma"); 
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 const register = asyncHandler(async (req, res) => {
   const input = validateRegisterInput(req.body);
