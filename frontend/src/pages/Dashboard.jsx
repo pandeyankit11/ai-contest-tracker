@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext'; // <-- Imported to get your token
+import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
 import CodeforcesCard from '../components/Dashboard/CodeforcesCard';
 import HeaderInfo from '../components/Dashboard/HeaderInfo';
@@ -7,13 +7,12 @@ import LinkedAccountsSummary from '../components/Dashboard/LinkedAccountsSummary
 import UpcomingContestsPreview from '../components/Dashboard/UpcomingContestsPreview';
 
 export const Dashboard = () => {
-  const { token } = useAuth(); // <-- Grab the auth token
+  const { token } = useAuth(); 
   const [activeUsers, setActiveUsers] = useState(0);
 
- useEffect(() => {
+  useEffect(() => {
     const fetchUserCount = async () => {
       try {
-        // Pointing EXACTLY to your Render backend so Vercel doesn't get confused
         const response = await fetch('https://ai-contest-tracker-v2.onrender.com/api/auth/total-users', {
           headers: {
             Authorization: `Bearer ${token}`
@@ -39,16 +38,8 @@ export const Dashboard = () => {
       <Header />
       <main className="page-shell dashboard-shell">
         
-        {/* Wrap HeaderInfo and the Badge in a Flex container to put it on the right */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          marginBottom: '24px'
-        }}>
-          <HeaderInfo />
-
-          {/* Sleek, simple badge aligned to the right */}
+        {/* --- THE FIX: Dedicated row for the badge, pushed to the far right --- */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
           <div style={{
             background: 'rgba(255, 255, 255, 0.05)',
             border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -58,14 +49,15 @@ export const Dashboard = () => {
             color: '#a1a1aa',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
-            marginTop: '10px' // Aligns it nicely with your Welcome text
+            gap: '8px'
           }}>
-            {/* Cool green glowing dot */}
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }}></span>
             Active users : <span style={{ color: '#fff', fontWeight: 'bold' }}>{activeUsers}</span>
           </div>
         </div>
+
+        {/* --- HeaderInfo is freed from Flexbox and restored to full width! --- */}
+        <HeaderInfo />
 
         <section className="dashboard-grid" aria-label="Dashboard summary">
           <CodeforcesCard />
