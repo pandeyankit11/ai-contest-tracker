@@ -37,12 +37,11 @@ export const Dashboard = () => {
     <>
       <Header />
 
-      {/* --- THE FIX: Moved completely OUTSIDE the middle block --- */}
-      {/* This attaches the badge directly to the page window so it aligns with the Header */}
+      {/* --- THE FIX: Increased top to 100px to push it down below the line --- */}
       <div style={{
         position: 'absolute',
-        top: '80px',       // Pushes it just below the navbar
-        right: '120px',    // Pushes it leftward past the "Logout" button to sit right under your Email ID
+        top: '100px',      // <-- Changed from 80px to 100px
+        right: '120px',    
         background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(59, 130, 246, 0.15))',
         backdropFilter: 'blur(10px)',
         border: '1px solid rgba(168, 85, 247, 0.4)',
