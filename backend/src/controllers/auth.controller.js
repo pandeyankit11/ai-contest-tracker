@@ -31,39 +31,44 @@ const login = asyncHandler(async (req, res) => {
 
 const me = asyncHandler(async (req, res) => {
   try {
-    // Fetch the user and specifically include the exact relation names from your schema
     const userWithStats = await prisma.user.findUnique({
       where: { id: req.user.id },
       include: {
         contestAccounts: true,
         platformStats: true,
         ratingSnapshots: true, 
-        solvedProblems: true,         // <-- ADDED THIS: Fetches individual Codeforces problems
-        contestParticipations: true,  // <-- ADDED THIS: Fetches all your contest history
+        solvedProblems: true,         
+        contestParticipations: true,  
       },
     });
+
+    const targetUser = userWithStats || req.user;
+
+    // --- THE FIX: Javascript destructuring to safely extract everything EXCEPT the password ---
+    const { password, ...safeUser } = targetUser;
 
     return res.status(200).json({
       success: true,
       data: {
-        user: userWithStats || req.user,
+        user: safeUser, // We only send the safe profile data!
       },
     });
   } catch (error) {
-    // If anything fails, log it but safely return the basic user so the app NEVER crashes
     console.error("PROFILE_FETCH_ERROR:", error.message);
+    
+    // Just in case it fails, we still make sure the fallback req.user doesn't leak it
+    const { password, ...safeFallbackUser } = req.user;
+    
     return res.status(200).json({
       success: true,
       data: {
-        user: req.user,
+        user: safeFallbackUser,
       },
     });
   }
 });
 
-// --- NEW: Function to get total registered users ---
 const getTotalUsers = asyncHandler(async (req, res) => {
-  // prisma.user.count() is extremely fast and literally just counts the rows
   const userCount = await prisma.user.count();
   
   res.status(200).json({
