@@ -21,18 +21,22 @@ app.use((req, res, next) => {
   next();
 });
 
-const allowedOrigins = [];
+// Hardcode your known safe URLs so it never fails, even if ENV variables mess up
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://ai-contest-tracker.vercel.app",
+  "https://www.ai-contest-tracker.vercel.app"
+];
 
-if (env.nodeEnv === "development") {
-  allowedOrigins.push("http://localhost:5173");
-}
-
+// Still add the ENV variable just in case, but strip any accidental trailing slashes
 if (env.frontendUrl) {
-  allowedOrigins.push(env.frontendUrl);
+  allowedOrigins.push(env.frontendUrl.replace(/\/$/, "")); 
 }
 
 const corsOptions = {
-  origin(origin, callback) {
+  origin: function (origin, callback) {
+    // Allow server-to-server requests or tools like Postman
     if (!origin) {
       return callback(null, true);
     }
@@ -41,9 +45,11 @@ const corsOptions = {
       return callback(null, true);
     }
 
+    // LOG the blocked origin so you can see exactly why it failed in Render logs
+    console.error(`[CORS ERROR] Blocked request from unauthorized origin: ${origin}`);
     callback(new Error("Not allowed by CORS"));
   },
-  credentials: true,
+  credentials: true, // Crucial for JWTs
 };
 
 app.use(helmet());
