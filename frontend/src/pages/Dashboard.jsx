@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext'; // <-- Imported to get your token
 import Header from '../components/Header';
 import CodeforcesCard from '../components/Dashboard/CodeforcesCard';
 import HeaderInfo from '../components/Dashboard/HeaderInfo';
@@ -6,14 +7,18 @@ import LinkedAccountsSummary from '../components/Dashboard/LinkedAccountsSummary
 import UpcomingContestsPreview from '../components/Dashboard/UpcomingContestsPreview';
 
 export const Dashboard = () => {
-  // --- NEW: State to hold the total number of registered users ---
+  const { token } = useAuth(); // <-- Grab the auth token
   const [activeUsers, setActiveUsers] = useState(0);
 
-  // --- NEW: Fetch the total user count when the dashboard loads ---
   useEffect(() => {
     const fetchUserCount = async () => {
       try {
-        const response = await fetch('/api/auth/total-users');
+        // Pass the token so the backend allows the request through!
+        const response = await fetch('/api/auth/total-users', {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
         const data = await response.json();
         
         if (data.success) {
@@ -24,31 +29,42 @@ export const Dashboard = () => {
       }
     };
 
-    fetchUserCount();
-  }, []);
+    if (token) {
+      fetchUserCount();
+    }
+  }, [token]);
 
   return (
     <>
       <Header />
       <main className="page-shell dashboard-shell">
-        <HeaderInfo />
-
-        {/* --- NEW: Active Users Banner --- */}
+        
+        {/* Wrap HeaderInfo and the Badge in a Flex container to put it on the right */}
         <div style={{
-          background: 'rgba(59, 130, 246, 0.1)', 
-          border: '1px solid rgba(59, 130, 246, 0.3)',
-          color: '#60a5fa',
-          padding: '10px 16px',
-          borderRadius: '8px',
           display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          marginBottom: '24px', // Adds perfect spacing before the cards start
-          fontWeight: '500',
-          width: 'fit-content' // Keeps the box wrapped tightly around the text
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          marginBottom: '24px'
         }}>
-          <span style={{ fontSize: '1.2em' }}>🔥</span>
-          Join {activeUsers} developers currently tracking their progress!
+          <HeaderInfo />
+
+          {/* Sleek, simple badge aligned to the right */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.05)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            padding: '6px 14px',
+            borderRadius: '20px',
+            fontSize: '0.9rem',
+            color: '#a1a1aa',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginTop: '10px' // Aligns it nicely with your Welcome text
+          }}>
+            {/* Cool green glowing dot */}
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }}></span>
+            Active users : <span style={{ color: '#fff', fontWeight: 'bold' }}>{activeUsers}</span>
+          </div>
         </div>
 
         <section className="dashboard-grid" aria-label="Dashboard summary">
