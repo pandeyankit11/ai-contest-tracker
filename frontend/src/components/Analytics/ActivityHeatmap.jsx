@@ -1,8 +1,24 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 const ActivityHeatmap = ({ data }) => {
-  // State to track our custom floating tooltip
   const [tooltip, setTooltip] = useState({ show: false, date: '', count: 0, x: 0, y: 0, color: '' });
+  
+  // --- NEW: Calculate available years based on the user's data ---
+  const availableYears = useMemo(() => {
+    if (!data) return [new Date().getFullYear()];
+    const years = new Set();
+    Object.values(data).forEach(datesArray => {
+      datesArray.forEach(d => {
+        if (d.date) years.add(new Date(d.date).getFullYear());
+      });
+    });
+    // If empty, fallback to this year
+    if (years.size === 0) return [new Date().getFullYear()];
+    return Array.from(years).sort((a, b) => b - a); // Sort newest to oldest
+  }, [data]);
+
+  // --- NEW: State to track the currently selected year ---
+  const [selectedYear, setSelectedYear] = useState(availableYears[0]);
 
   if (!data || Object.keys(data).length === 0) {
     return (
@@ -18,35 +34,55 @@ const ActivityHeatmap = ({ data }) => {
   }
 
   const getHeatmapColor = (count, maxCount) => {
-    if (count === 0) return 'rgba(148, 163, 184, 0.1)'; // Empty square
+    if (count === 0) return 'rgba(148, 163, 184, 0.1)'; 
     const intensity = (count / maxCount) * 0.8 + 0.2;
-    return `rgba(37, 99, 235, ${intensity})`; // Blue gradient
+    return `rgba(37, 99, 235, ${intensity})`; 
   };
 
   return (
     <div>
-      <div className="card-heading">
+      {/* --- NEW: Header now includes the Year Dropdown --- */}
+      <div className="card-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2>Activity Heatmap</h2>
+        
+        <select 
+          value={selectedYear} 
+          onChange={(e) => setSelectedYear(Number(e.target.value))}
+          style={{
+            background: 'rgba(15, 23, 42, 0.6)',
+            border: '1px solid rgba(148, 163, 184, 0.2)',
+            color: '#e2e8f0',
+            padding: '6px 12px',
+            borderRadius: '6px',
+            fontSize: '14px',
+            cursor: 'pointer',
+            outline: 'none'
+          }}
+        >
+          {availableYears.map(year => (
+            <option key={year} value={year}>{year}</option>
+          ))}
+        </select>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
         {Object.entries(data).map(([platform, datesArray]) => {
           if (!datesArray || datesArray.length === 0) return null;
 
-          // Find the maximum count for scaling the colors
           const maxCount = Math.max(...datesArray.map((d) => d.count), 1);
           const dateMap = new Map(datesArray.map((d) => [d.date, d.count]));
 
-          // Find start and end dates to build a complete timeline
-          const sortedDates = [...datesArray].sort((a, b) => new Date(a.date) - new Date(b.date));
-          const firstDate = new Date(sortedDates[0].date);
-          const lastDate = new Date(); // Up to today
-
-          // Snap to the nearest Sunday (start) and Saturday (end)
+          // --- NEW: Timeline strictly bound to the selected year ---
+          // Find the nearest Sunday before Jan 1st of the selected year
+          const firstDate = new Date(selectedYear, 0, 1); 
           firstDate.setDate(firstDate.getDate() - firstDate.getDay());
+
+          // Find the nearest Saturday after Dec 31st of the selected year
+          // If the selected year is the CURRENT year, stop at today so it doesn't draw empty future boxes
+          const today = new Date();
+          let lastDate = selectedYear === today.getFullYear() ? new Date() : new Date(selectedYear, 11, 31);
           lastDate.setDate(lastDate.getDate() + (6 - lastDate.getDay()));
 
-          // Generate timeline
           const timeline = [];
           let current = new Date(firstDate);
           while (current <= lastDate) {
@@ -60,7 +96,6 @@ const ActivityHeatmap = ({ data }) => {
                 <strong style={{ color: 'var(--text-h)' }}>{platform}</strong>
               </div>
 
-              {/* Scrollable wrapper */}
               <div style={{ overflowX: 'auto', paddingBottom: '12px' }}>
                 <div
                   style={{
@@ -88,7 +123,6 @@ const ActivityHeatmap = ({ data }) => {
                           cursor: 'pointer',
                           transition: 'transform 0.1s ease, border-color 0.1s ease'
                         }}
-                        // Interactive Hover Handlers
                         onMouseEnter={(e) => {
                           e.target.style.transform = 'scale(1.2)';
                           e.target.style.borderColor = 'rgba(255, 255, 255, 0.5)';
@@ -98,7 +132,7 @@ const ActivityHeatmap = ({ data }) => {
                             count: count,
                             x: e.clientX,
                             y: e.clientY,
-                            color: count > 0 ? squareColor : '#4b5563' // Gray for empty days
+                            color: count > 0 ? squareColor : '#4b5563'
                           });
                         }}
                         onMouseLeave={(e) => {
@@ -129,7 +163,7 @@ const ActivityHeatmap = ({ data }) => {
         })}
       </div>
 
-      {/* The Floating Tooltip Overlay */}
+      {/* Floating Tooltip */}
       {tooltip.show && (
         <div
           style={{
