@@ -5,10 +5,6 @@ const {
 const { loginUser, registerUser } = require("../services/auth.service");
 const { asyncHandler } = require("../utils/asyncHandler");
 
-// THE FIX: Pointing exactly to where your prisma.js file lives
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
-
 const register = asyncHandler(async (req, res) => {
   const input = validateRegisterInput(req.body);
   const authResult = await registerUser(input);
@@ -30,18 +26,10 @@ const login = asyncHandler(async (req, res) => {
 });
 
 const me = asyncHandler(async (req, res) => {
-  // Fetch the full user details along with their platform standings
-  const userWithStats = await prisma.user.findUnique({
-    where: { id: req.user.id },
-    include: {
-      platforms: true, // This fetches LeetCode/Codeforces data linked to this user
-    },
-  });
-
   res.status(200).json({
     success: true,
     data: {
-      user: userWithStats,
+      user: req.user,
     },
   });
 });
