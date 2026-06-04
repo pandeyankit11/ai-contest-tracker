@@ -36,47 +36,45 @@ export const Dashboard = () => {
   return (
     <>
       <Header />
-      {/* Added position: 'relative' to lock the absolute badge to this container */}
-      <main className="page-shell dashboard-shell" style={{ position: 'relative', paddingTop: '40px' }}>
-        
-        {/* --- THE GLAMOROUS BADGE --- */}
-        <div style={{
-          position: 'absolute',
-          top: '0px',     // Pushes it right below the navigation header
-          right: '0px',   // Aligns it perfectly to the right side
-          background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.1), rgba(59, 130, 246, 0.1))',
-          backdropFilter: 'blur(10px)',
-          border: '1px solid rgba(168, 85, 247, 0.4)',
-          boxShadow: '0 4px 20px rgba(168, 85, 247, 0.2), inset 0 0 12px rgba(255, 255, 255, 0.05)',
-          padding: '8px 20px',
-          borderRadius: '30px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          zIndex: 10
-        }}>
-          {/* Double-glowing neon green dot */}
-          <span style={{ 
-            width: '8px', 
-            height: '8px', 
-            borderRadius: '50%', 
-            background: '#10b981', 
-            boxShadow: '0 0 8px #10b981, 0 0 16px #10b981' 
-          }}></span>
-          
-          <span style={{
-            color: '#e2e8f0',
-            fontSize: '0.9rem',
-            fontWeight: '600',
-            letterSpacing: '0.5px'
-          }}>
-            ACTIVE USERS : <span style={{ color: '#fff', fontSize: '1.05rem', marginLeft: '4px' }}>{activeUsers}</span>
-          </span>
-        </div>
 
+      {/* --- THE FIX: Moved completely OUTSIDE the middle block --- */}
+      {/* This attaches the badge directly to the page window so it aligns with the Header */}
+      <div style={{
+        position: 'absolute',
+        top: '80px',       // Pushes it just below the navbar
+        right: '120px',    // Pushes it leftward past the "Logout" button to sit right under your Email ID
+        background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(59, 130, 246, 0.15))',
+        backdropFilter: 'blur(10px)',
+        border: '1px solid rgba(168, 85, 247, 0.4)',
+        boxShadow: '0 4px 20px rgba(168, 85, 247, 0.2), inset 0 0 12px rgba(255, 255, 255, 0.05)',
+        padding: '8px 20px',
+        borderRadius: '30px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        zIndex: 100
+      }}>
+        <span style={{ 
+          width: '8px', 
+          height: '8px', 
+          borderRadius: '50%', 
+          background: '#10b981', 
+          boxShadow: '0 0 8px #10b981, 0 0 16px #10b981' 
+        }}></span>
+        <span style={{
+          color: '#e2e8f0',
+          fontSize: '0.9rem',
+          fontWeight: '600',
+          letterSpacing: '0.5px'
+        }}>
+          ACTIVE USERS : <span style={{ color: '#fff', fontSize: '1.05rem', marginLeft: '4px' }}>{activeUsers}</span>
+        </span>
+      </div>
+
+      <main className="page-shell dashboard-shell">
         <HeaderInfo />
 
-        <section className="dashboard-grid" aria-label="Dashboard summary" style={{ marginTop: '24px' }}>
+        <section className="dashboard-grid" aria-label="Dashboard summary" style={{ marginTop: '32px' }}>
           <CodeforcesCard />
           <LinkedAccountsSummary />
           <UpcomingContestsPreview />
