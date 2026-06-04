@@ -1,6 +1,10 @@
+import { useState } from 'react';
 import './TopicBreakdown.css';
 
 const TopicBreakdown = ({ data }) => {
+  // --- NEW: State to track which platform's topic list is expanded ---
+  const [expanded, setExpanded] = useState({});
+
   if (!data || Object.keys(data).length === 0) {
     return (
       <>
@@ -14,6 +18,14 @@ const TopicBreakdown = ({ data }) => {
     );
   }
 
+  // --- NEW: Toggle function for the "Show more / Show less" button ---
+  const toggleExpand = (platform) => {
+    setExpanded((prev) => ({
+      ...prev,
+      [platform]: !prev[platform],
+    }));
+  };
+
   return (
     <div>
       <div className="card-heading">
@@ -22,12 +34,15 @@ const TopicBreakdown = ({ data }) => {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
         {Object.entries(data).map(([platform, topicsArray]) => {
-          // The backend already sends a sorted array of objects [{topic, count}]
-          // Just slice the top 8 for display
-          const topTopics = topicsArray.slice(0, 8);
           
-          // Find the max count for the progress bar scaling
-          const maxCount = Math.max(...topTopics.map((t) => t.count), 1);
+          // Check if this specific platform is expanded
+          const isExpanded = expanded[platform];
+          
+          // Slice the array if it's collapsed, show all if expanded
+          const displayTopics = isExpanded ? topicsArray : topicsArray.slice(0, 8);
+          
+          // Calculate maxCount based on ALL topics so the bars don't jump when expanding
+          const maxCount = Math.max(...topicsArray.map((t) => t.count), 1);
 
           return (
             <div key={platform} className="topics-card">
@@ -36,8 +51,7 @@ const TopicBreakdown = ({ data }) => {
               </div>
 
               <div style={{ display: 'grid', gap: '8px' }}>
-                {/* Destructure topic and count directly from the object */}
-                {topTopics.map(({ topic, count }) => {
+                {displayTopics.map(({ topic, count }) => {
                   const percentage = (count / maxCount) * 100;
 
                   return (
@@ -93,9 +107,23 @@ const TopicBreakdown = ({ data }) => {
                 })}
               </div>
 
+              {/* --- NEW: Interactive Toggle Button --- */}
               {topicsArray.length > 8 && (
-                <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--text-soft)' }}>
-                  +{topicsArray.length - 8} more topics
+                <div
+                  onClick={() => toggleExpand(platform)}
+                  style={{
+                    marginTop: '12px',
+                    fontSize: '12px',
+                    color: 'var(--accent, #3b82f6)', // Bright blue so it looks clickable
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    display: 'inline-block',
+                    transition: 'color 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => e.target.style.color = '#60a5fa'} // Lighter blue on hover
+                  onMouseLeave={(e) => e.target.style.color = 'var(--accent, #3b82f6)'}
+                >
+                  {isExpanded ? 'Show less' : `+${topicsArray.length - 8} more topics`}
                 </div>
               )}
             </div>
