@@ -4,8 +4,9 @@ const {
 } = require("../validators/auth.validator");
 const { loginUser, registerUser } = require("../services/auth.service");
 const { asyncHandler } = require("../utils/asyncHandler");
-// 1. Make sure prisma is imported at the top (adjust path if your prisma client is elsewhere)
-const prisma = require("../config/prisma"); 
+
+// THE FIX: Pointing exactly to where your prisma.js file lives
+const prisma = require("../../prisma"); 
 
 const register = asyncHandler(async (req, res) => {
   const input = validateRegisterInput(req.body);
@@ -27,7 +28,6 @@ const login = asyncHandler(async (req, res) => {
   });
 });
 
-// 2. Update the 'me' controller function here:
 const me = asyncHandler(async (req, res) => {
   // Fetch the full user details along with their platform standings
   const userWithStats = await prisma.user.findUnique({
