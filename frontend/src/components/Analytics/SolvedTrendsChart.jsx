@@ -36,19 +36,19 @@ const SolvedTrendsChart = ({ data }) => {
           const contentWidth = chartWidth - padding * 2;
 
           return (
-            <div key={platform} className="trends-card">
+            <div key={platform} className="trends-card" style={{ marginBottom: '16px' }}>
               <div style={{ marginBottom: '12px' }}>
                 <strong style={{ color: 'var(--text-h)' }}>{platform}</strong>
               </div>
 
-              <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} style={{ width: '100%', height: '200px' }}>
+              <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} style={{ width: '100%', height: '200px', overflow: 'visible' }}>
                 {/* Y-axis labels */}
                 <text x="35" y="18" fontSize="12" fill="var(--text-soft)" textAnchor="end">
                   {maxCount}
                 </text>
                 <text
                   x="35"
-                  y={chartHeight - 8}
+                  y={chartHeight - padding + 5} 
                   fontSize="12"
                   fill="var(--text-soft)"
                   textAnchor="end"
@@ -56,7 +56,7 @@ const SolvedTrendsChart = ({ data }) => {
                   0
                 </text>
 
-                {/* Grid lines */}
+                {/* Grid lines (Bottom base line) */}
                 <line
                   x1={padding}
                   y1={chartHeight - padding}
@@ -66,6 +66,7 @@ const SolvedTrendsChart = ({ data }) => {
                   strokeDasharray="4,4"
                 />
 
+                {/* Grid lines (Middle line) */}
                 <line
                   x1={padding}
                   y1={padding + contentHeight / 2}
@@ -74,6 +75,46 @@ const SolvedTrendsChart = ({ data }) => {
                   stroke="rgba(148, 163, 184, 0.1)"
                   strokeDasharray="4,4"
                 />
+
+                {/* --- NEW FIX: X-Axis Date Labels --- */}
+                {trends.length > 0 && (() => {
+                  const labelIndices = [];
+                  
+                  if (trends.length <= 4) {
+                    trends.forEach((_, i) => labelIndices.push(i));
+                  } else {
+                    labelIndices.push(0); 
+                    labelIndices.push(Math.floor(trends.length / 3)); 
+                    labelIndices.push(Math.floor((2 * trends.length) / 3)); 
+                    labelIndices.push(trends.length - 1); 
+                  }
+
+                  return labelIndices.map((idx) => {
+                    const point = trends[idx];
+                    const xPos = padding + (idx / (trends.length - 1 || 1)) * contentWidth;
+                    
+                    let textAnchor = "middle";
+                    if (idx === 0) textAnchor = "start";
+                    if (idx === trends.length - 1) textAnchor = "end";
+
+                    const dateStr = point.date 
+                      ? new Date(point.date).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
+                      : '';
+
+                    return (
+                      <text
+                        key={`x-label-${idx}`}
+                        x={xPos}
+                        y={chartHeight - padding + 24} // Positioned perfectly below the grid line
+                        fontSize="11"
+                        fill="rgba(148, 163, 184, 0.6)"
+                        textAnchor={textAnchor}
+                      >
+                        {dateStr}
+                      </text>
+                    );
+                  });
+                })()}
 
                 {/* Area under curve */}
                 {trends.length > 1 && (
@@ -101,20 +142,11 @@ const SolvedTrendsChart = ({ data }) => {
                       if (idx === 0) return null;
 
                       const prevPoint = trends[idx - 1];
-                      const prevXPos =
-                        padding +
-                        ((idx - 1) / (trends.length - 1)) * contentWidth;
-                      const prevYPos =
-                        chartHeight -
-                        padding -
-                        ((prevPoint.count || 0) / maxCount) * contentHeight;
+                      const prevXPos = padding + ((idx - 1) / (trends.length - 1)) * contentWidth;
+                      const prevYPos = chartHeight - padding - ((prevPoint.count || 0) / maxCount) * contentHeight;
 
-                      const xPos =
-                        padding + (idx / (trends.length - 1)) * contentWidth;
-                      const yPos =
-                        chartHeight -
-                        padding -
-                        ((point.count || 0) / maxCount) * contentHeight;
+                      const xPos = padding + (idx / (trends.length - 1)) * contentWidth;
+                      const yPos = chartHeight - padding - ((point.count || 0) / maxCount) * contentHeight;
 
                       return (
                         <line
@@ -132,12 +164,8 @@ const SolvedTrendsChart = ({ data }) => {
 
                     {/* Data points */}
                     {trends.map((point, idx) => {
-                      const xPos =
-                        padding + (idx / (trends.length - 1)) * contentWidth;
-                      const yPos =
-                        chartHeight -
-                        padding -
-                        ((point.count || 0) / maxCount) * contentHeight;
+                      const xPos = padding + (idx / (trends.length - 1)) * contentWidth;
+                      const yPos = chartHeight - padding - ((point.count || 0) / maxCount) * contentHeight;
 
                       return (
                         <circle
@@ -154,15 +182,15 @@ const SolvedTrendsChart = ({ data }) => {
                 )}
               </svg>
 
-              <div style={{ marginTop: '12px', display: 'flex', gap: '20px', fontSize: '12px', justifyContent: 'space-between' }}>
+              <div style={{ marginTop: '16px', display: 'flex', gap: '20px', fontSize: '12px', justifyContent: 'space-between', color: 'var(--text-soft)' }}>
                 <span>
-                  Start: <strong>{trends[0]?.date}</strong>
+                  Start: <strong style={{ color: 'var(--text-h)' }}>{trends[0]?.date}</strong>
                 </span>
                 <span>
-                  End: <strong>{trends[trends.length - 1]?.date}</strong>
+                  End: <strong style={{ color: 'var(--text-h)' }}>{trends[trends.length - 1]?.date}</strong>
                 </span>
                 <span>
-                  Total: <strong>{trends[trends.length - 1]?.count || 0}</strong>
+                  Total: <strong style={{ color: 'var(--text-h)', color: '#3b82f6' }}>{trends[trends.length - 1]?.count || 0}</strong>
                 </span>
               </div>
             </div>
