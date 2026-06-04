@@ -67,8 +67,52 @@ const RatingChart = ({ data }) => {
                   0
                 </text>
 
-                {/* Grid lines */}
+                {/* Grid line (Base line for the X axis) */}
                 <line x1="40" y1={chartHeight - chartPadding} x2="590" y2={chartHeight - chartPadding} stroke="rgba(148, 163, 184, 0.2)" strokeDasharray="4,4" />
+
+                {/* --- THE FIX: X-Axis Date Labels --- */}
+                {platformData.history.length > 0 && (() => {
+                  const history = platformData.history;
+                  const labelIndices = [];
+                  
+                  // Pick 4 evenly spaced points (or all if very few data points)
+                  if (history.length <= 4) {
+                    history.forEach((_, i) => labelIndices.push(i));
+                  } else {
+                    labelIndices.push(0); // Start date
+                    labelIndices.push(Math.floor(history.length / 3)); // 33% mark
+                    labelIndices.push(Math.floor((2 * history.length) / 3)); // 66% mark
+                    labelIndices.push(history.length - 1); // End date
+                  }
+
+                  return labelIndices.map((idx) => {
+                    const point = history[idx];
+                    const xPos = 40 + (idx / (history.length - 1 || 1)) * (590 - 40);
+                    
+                    // Smart alignment so labels don't get chopped off the edges
+                    let textAnchor = "middle";
+                    if (idx === 0) textAnchor = "start";
+                    if (idx === history.length - 1) textAnchor = "end";
+
+                    // Format date elegantly to "Mon YYYY" (e.g. "Apr 2025")
+                    const dateStr = point.date 
+                      ? new Date(point.date).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
+                      : '';
+
+                    return (
+                      <text
+                        key={`x-label-${idx}`}
+                        x={xPos}
+                        y={chartHeight - 15} // Placed perfectly below the bottom grid line
+                        fontSize="11"
+                        fill="rgba(148, 163, 184, 0.6)" // Matches text-soft color
+                        textAnchor={textAnchor}
+                      >
+                        {dateStr}
+                      </text>
+                    );
+                  });
+                })()}
 
                 {/* Data points and line */}
                 {platformData.history.length > 0 && (
