@@ -10,11 +10,11 @@ export const Dashboard = () => {
   const { token } = useAuth(); // <-- Grab the auth token
   const [activeUsers, setActiveUsers] = useState(0);
 
-  useEffect(() => {
+ useEffect(() => {
     const fetchUserCount = async () => {
       try {
-        // Pass the token so the backend allows the request through!
-        const response = await fetch('/api/auth/total-users', {
+        // Pointing EXACTLY to your Render backend so Vercel doesn't get confused
+        const response = await fetch('https://ai-contest-tracker-v2.onrender.com/api/auth/total-users', {
           headers: {
             Authorization: `Bearer ${token}`
           }
@@ -25,7 +25,7 @@ export const Dashboard = () => {
           setActiveUsers(data.totalUsers);
         }
       } catch (error) {
-        console.error("Failed to fetch user count", error);
+        console.error("Failed to fetch user count:", error);
       }
     };
 
