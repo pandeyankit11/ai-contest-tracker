@@ -22,6 +22,7 @@ const Profile = () => {
 
   // Whenever the user object loads or updates, extract the stats instantly
   // Whenever the user object loads or updates, extract the stats instantly
+  // Whenever the user object loads or updates, extract the stats instantly
   useEffect(() => {
     if (user) {
       setUsername(user.username || "Ankit");
@@ -29,33 +30,35 @@ const Profile = () => {
       // 1. Extract Codeforces Ratings (Sorted to get the LATEST rating)
       const cfSnapshots = user.ratingSnapshots
         ?.filter(s => s.platform === 'CODEFORCES')
-        ?.sort((a, b) => new Date(b.recordedAt) - new Date(a.recordedAt)); // Sort newest to oldest
+        ?.sort((a, b) => new Date(b.recordedAt) - new Date(a.recordedAt)); 
       
-      const latestCfSnapshot = cfSnapshots?.[0]; // Grab the top one
+      const latestCfSnapshot = cfSnapshots?.[0]; 
       const cfRating = latestCfSnapshot?.rating || 0;
       const cfMaxRating = latestCfSnapshot?.maxRating || 0;
 
-      // 2. Extract LeetCode Solved (Easy + Medium + Hard from platformStats)
+      // 2. Count Solved Problems (LeetCode from stats + Codeforces from array)
       const lcStats = user.platformStats?.find(s => s.platform === 'LEETCODE');
       const lcSolved = lcStats ? (lcStats.easy + lcStats.medium + lcStats.hard) : 0;
+      
+      const cfSolved = user.solvedProblems?.filter(p => p.platform === 'CODEFORCES').length || 0;
 
-      // 3. Calculate Global Problems (Sum of all platforms)
-      const globalProblems = user.platformStats?.reduce((total, stat) => {
-        return total + (stat.easy || 0) + (stat.medium || 0) + (stat.hard || 0);
-      }, 0) || 0;
+      const globalProblems = lcSolved + cfSolved;
+
+      // 3. Count Contests (Filtering the contestParticipations array)
+      const lcRecentContests = user.contestParticipations?.filter(c => c.platform === 'LEETCODE').length || 0;
+      const globalContests = user.contestParticipations?.length || 0;
 
       // 4. Set the UI State
       setStats({
         cfRating,
         cfMaxRating,
         lcSolved,
-        lcRecentContests: 0, 
+        lcRecentContests, 
         globalProblems,
-        globalContests: 0    
+        globalContests    
       });
     }
   }, [user]);
-
   const email = user?.email || "pandeyankit9a@gmail.com";
   const joinedDate = user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : "Just now";
 

@@ -38,6 +38,8 @@ const me = asyncHandler(async (req, res) => {
         contestAccounts: true,
         platformStats: true,
         ratingSnapshots: true, 
+        solvedProblems: true,         // <-- ADDED THIS: Fetches individual Codeforces problems
+        contestParticipations: true,  // <-- ADDED THIS: Fetches all your contest history
       },
     });
 
