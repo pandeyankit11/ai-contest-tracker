@@ -97,21 +97,8 @@ function assertValidFetchResponse(response) {
     typeof response.json === "function";
 
   if (!isValidResponse) {
-    throw new AppError(
-      "LeetCode returned an invalid HTTP response",
-      502,
-      "LEETCODE_INVALID_RESPONSE"
-    );
+    throw new AppError("LeetCode returned an invalid HTTP response", 502, "LEETCODE_INVALID_RESPONSE");
   }
-}
-
-function getGraphQLErrorMessage(errors) {
-  if (!Array.isArray(errors) || errors.length === 0) {
-    return "LeetCode GraphQL request failed";
-  }
-
-  const firstError = errors.find((error) => error && typeof error.message === "string");
-  return firstError?.message || "LeetCode GraphQL request failed";
 }
 
 async function fetchLeetCodeGraphQL(query, variables = {}) {
@@ -119,7 +106,6 @@ async function fetchLeetCodeGraphQL(query, variables = {}) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      // CRITICAL: This bypasses the Cloudflare infinite hang
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       'Accept': '*/*',
       'Referer': 'https://leetcode.com/'
@@ -136,17 +122,9 @@ async function fetchLeetCodeGraphQL(query, variables = {}) {
 }
 
 function parseSubmissionCalendar(value) {
-  if (!value) {
-    return {};
-  }
-
-  if (typeof value === "object" && !Array.isArray(value)) {
-    return value;
-  }
-
-  if (typeof value !== "string") {
-    return {};
-  }
+  if (!value) return {};
+  if (typeof value === "object" && !Array.isArray(value)) return value;
+  if (typeof value !== "string") return {};
 
   try {
     const parsed = JSON.parse(value);
@@ -180,26 +158,19 @@ function assertValidUserAnalytics(data) {
     typeof data.matchedUser.username === "string";
 
   if (!hasValidUser) {
-    throw new AppError(
-      "LeetCode user not found or returned an invalid response",
-      502,
-      "LEETCODE_INVALID_RESPONSE"
-    );
+    throw new AppError("LeetCode user not found or returned an invalid response", 502, "LEETCODE_INVALID_RESPONSE");
   }
 }
 
 function formatUserAnalytics(data) {
   assertValidUserAnalytics(data);
-
   const acSubmissionNum = data.matchedUser.submitStats?.acSubmissionNum;
 
   return {
     username: data.matchedUser.username,
     solvedStats: formatSolvedStats(Array.isArray(acSubmissionNum) ? acSubmissionNum : []),
     submissionCalendar: parseSubmissionCalendar(data.matchedUser.submissionCalendar),
-    recentAcceptedSubmissions: Array.isArray(data.recentAcSubmissionList)
-      ? data.recentAcSubmissionList
-      : [],
+    recentAcceptedSubmissions: Array.isArray(data.recentAcSubmissionList) ? data.recentAcSubmissionList : [],
     contestRanking: data.userContestRanking || null,
   };
 }
@@ -216,11 +187,7 @@ async function fetchLeetCodeUserAnalytics(username, { recentLimit } = {}) {
 
 async function fetchLeetCodeQuestion(titleSlug) {
   if (typeof titleSlug !== "string" || titleSlug.trim().length === 0) {
-    throw new AppError(
-      "LeetCode problem slug is missing",
-      422,
-      "LEETCODE_PROBLEM_SLUG_MISSING"
-    );
+    throw new AppError("LeetCode problem slug is missing", 422, "LEETCODE_PROBLEM_SLUG_MISSING");
   }
 
   const data = await fetchLeetCodeGraphQL(LEETCODE_QUESTION_QUERY, {
@@ -228,11 +195,7 @@ async function fetchLeetCodeQuestion(titleSlug) {
   });
 
   if (!data || !data.question || typeof data.question !== "object") {
-    throw new AppError(
-      "LeetCode returned an invalid problem response",
-      502,
-      "LEETCODE_INVALID_RESPONSE"
-    );
+    throw new AppError("LeetCode returned an invalid problem response", 502, "LEETCODE_INVALID_RESPONSE");
   }
 
   return data.question;
@@ -240,33 +203,21 @@ async function fetchLeetCodeQuestion(titleSlug) {
 
 function formatLeetCodeRatingSnapshot(userId, contestRanking, recordedAt) {
   const rating = normalizeInteger(contestRanking?.rating);
-
-  if (rating === null) {
-    return null;
-  }
+  if (rating === null) return null;
 
   return {
     userId,
     platform: LEETCODE_PLATFORM,
     rating,
     maxRating: rating,
-    rank: Number.isFinite(contestRanking.globalRanking)
-      ? String(contestRanking.globalRanking)
-      : null,
+    rank: Number.isFinite(contestRanking.globalRanking) ? String(contestRanking.globalRanking) : null,
     recordedAt,
   };
 }
 
 async function syncLeetCodeRatingSnapshot(userId, contestRanking, recordedAt) {
   const snapshot = formatLeetCodeRatingSnapshot(userId, contestRanking, recordedAt);
-
-  if (!snapshot) {
-    return {
-      processed: 0,
-      upserted: 0,
-      failed: 0,
-    };
-  }
+  if (!snapshot) return { processed: 0, upserted: 0, failed: 0 };
 
   try {
     await prisma.ratingSnapshot.upsert({
@@ -284,54 +235,27 @@ async function syncLeetCodeRatingSnapshot(userId, contestRanking, recordedAt) {
       },
       create: snapshot,
     });
-
-    return {
-      processed: 1,
-      upserted: 1,
-      failed: 0,
-    };
+    return { processed: 1, upserted: 1, failed: 0 };
   } catch (_error) {
-    return {
-      processed: 0,
-      upserted: 0,
-      failed: 1,
-    };
+    return { processed: 0, upserted: 0, failed: 1 };
   }
 }
 
 function normalizeTopicTags(topicTags) {
-  if (!Array.isArray(topicTags)) {
-    return [];
-  }
-
-  return topicTags
-    .map((tag) => tag?.name)
-    .filter((name) => typeof name === "string" && name.trim().length > 0);
+  if (!Array.isArray(topicTags)) return [];
+  return topicTags.map((tag) => tag?.name).filter((name) => typeof name === "string" && name.trim().length > 0);
 }
 
 function formatLeetCodeSolvedProblem(userId, submission, question) {
-  if (
-    !submission ||
-    typeof submission !== "object" ||
-    typeof submission.titleSlug !== "string" ||
-    !Number.isFinite(Number(submission.timestamp))
-  ) {
-    throw new AppError(
-      "LeetCode returned an invalid accepted submission response",
-      502,
-      "LEETCODE_INVALID_RESPONSE"
-    );
+  if (!submission || typeof submission !== "object" || typeof submission.titleSlug !== "string" || !Number.isFinite(Number(submission.timestamp))) {
+    throw new AppError("LeetCode returned an invalid accepted submission response", 502, "LEETCODE_INVALID_RESPONSE");
   }
 
   const titleSlug = submission.titleSlug.trim();
   const title = question?.title || submission.title;
 
   if (!titleSlug || typeof title !== "string" || title.trim().length === 0) {
-    throw new AppError(
-      "LeetCode returned an invalid solved problem response",
-      502,
-      "LEETCODE_INVALID_RESPONSE"
-    );
+    throw new AppError("LeetCode returned an invalid solved problem response", 502, "LEETCODE_INVALID_RESPONSE");
   }
 
   return {
@@ -350,11 +274,7 @@ function formatLeetCodeSolvedProblem(userId, submission, question) {
 
 async function syncLeetCodeSolvedProblems(userId, recentAcceptedSubmissions) {
   const uniqueSubmissions = new Map();
-  const results = {
-    processed: 0,
-    upserted: 0,
-    failed: 0,
-  };
+  const results = { processed: 0, upserted: 0, failed: 0 };
 
   for (const submission of recentAcceptedSubmissions) {
     if (!submission || typeof submission.titleSlug !== "string") {
@@ -405,57 +325,71 @@ async function syncLeetCodeSolvedProblems(userId, recentAcceptedSubmissions) {
   return results;
 }
 
-async function syncLeetCodeAnalytics(userId, username, options = {}) {
-  console.log(`[LEETCODE SERVICE] Started sync for handle: ${username}`);
-  const recordedAt = options.recordedAt || new Date();
+// --- THE FIX: Backfill missing historical data from the LeetCode Calendar ---
+async function syncHistoricalCalendar(userId, username, submissionCalendar) {
+  if (!submissionCalendar || Object.keys(submissionCalendar).length === 0) return { upserted: 0 };
+  const results = { upserted: 0, failed: 0 };
 
   try {
-    console.log(`[LEETCODE SERVICE] Fetching LeetCode analytics from API (Waiting up to 10s)...`);
+    // 1. Get current counts per day from DB to prevent double-counting
+    const existingLC = await prisma.solvedProblem.findMany({
+      where: { userId, platform: LEETCODE_PLATFORM },
+      select: { externalId: true, solvedAt: true }
+    });
 
-    // 1. Create a 10-second timeout promise
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("TIMEOUT: LeetCode API request hung for 10 seconds (Likely blocked by Cloudflare)")), 10000)
-    );
+    const existingByDate = {};
+    for (const p of existingLC) {
+      if (!p.solvedAt) continue;
+      const dKey = p.solvedAt.toISOString().split("T")[0];
+      existingByDate[dKey] = (existingByDate[dKey] || 0) + 1;
+    }
 
-    // 2. Race the API call against the timeout
-    const analytics = await Promise.race([
-      fetchLeetCodeUserAnalytics(username, { recentLimit: options.recentLimit }),
-      timeoutPromise
-    ]);
+    // 2. Prepare missing activity blocks
+    const dummyProblems = [];
+    for (const [timestampStr, count] of Object.entries(submissionCalendar)) {
+      const timestamp = parseInt(timestampStr, 10);
+      if (isNaN(timestamp)) continue;
 
-    console.log(`[LEETCODE SERVICE] Successfully fetched analytics data. Saving to database...`);
+      const dateObj = new Date(timestamp * 1000);
+      const dKey = dateObj.toISOString().split("T")[0];
 
-    await syncPlatformStats(userId, analytics.solvedStats);
-    console.log(`[LEETCODE SERVICE] Platform stats saved.`);
+      const existingCount = existingByDate[dKey] || 0;
+      const missingCount = count - existingCount;
 
-    const [ratingSnapshot, solvedProblems] = await Promise.all([
-      syncLeetCodeRatingSnapshot(userId, analytics.contestRanking, recordedAt),
-      syncLeetCodeSolvedProblems(userId, analytics.recentAcceptedSubmissions),
-    ]);
+      if (missingCount > 0) {
+        for (let i = 0; i < missingCount; i++) {
+          dummyProblems.push({
+            userId,
+            platform: LEETCODE_PLATFORM,
+            externalId: `lc-historical-${dKey}-${existingCount + i}`,
+            name: "Historical Activity",
+            url: `https://leetcode.com/${username}`, // Link to profile since we don't know the exact problem
+            tags: [],
+            difficulty: null,
+            rating: null,
+            solvedAt: dateObj
+          });
+        }
+      }
+    }
 
-    console.log(`[LEETCODE SERVICE] Sync fully complete for ${username}`);
-
-    return {
-      username: analytics.username,
-      solvedStats: analytics.solvedStats,
-      submissionCalendar: analytics.submissionCalendar,
-      ratingSnapshot,
-      solvedProblems,
-      limitations: {
-        fullSolvedProblemHistory:
-          "LeetCode GraphQL exposes aggregate solved counts and recent accepted submissions without scraping; full solved-problem history is not persisted.",
-        submissionCalendar:
-          "Submission calendar is returned by the service but not persisted because the current Prisma schema has no activity-calendar model.",
-      },
-    };
+    // 3. Bulk insert for ultra-fast performance
+    if (dummyProblems.length > 0) {
+      await prisma.solvedProblem.createMany({
+        data: dummyProblems,
+        skipDuplicates: true
+      });
+      results.upserted = dummyProblems.length;
+    }
   } catch (error) {
-    // This will finally log the error to your terminal!
-    console.error(`[LEETCODE SERVICE] ERROR during sync:`, error.message);
-    throw error;
+    console.error(`[LEETCODE SERVICE] Error syncing historical calendar:`, error.message);
+    results.failed = 1;
   }
+
+  return results;
 }
+
 async function syncPlatformStats(userId, solvedStats) {
-  // Matches your @@unique([userId, platform]) in schema.prisma
   await prisma.platformStats.upsert({
     where: { 
       userId_platform: { userId, platform: LEETCODE_PLATFORM } 
@@ -475,6 +409,45 @@ async function syncPlatformStats(userId, solvedStats) {
   });
 }
 
+async function syncLeetCodeAnalytics(userId, username, options = {}) {
+  console.log(`[LEETCODE SERVICE] Started sync for handle: ${username}`);
+  const recordedAt = options.recordedAt || new Date();
+
+  try {
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("TIMEOUT: LeetCode API request hung for 10 seconds")), 10000)
+    );
+
+    const analytics = await Promise.race([
+      fetchLeetCodeUserAnalytics(username, { recentLimit: options.recentLimit }),
+      timeoutPromise
+    ]);
+
+    await syncPlatformStats(userId, analytics.solvedStats);
+
+    const [ratingSnapshot, solvedProblems] = await Promise.all([
+      syncLeetCodeRatingSnapshot(userId, analytics.contestRanking, recordedAt),
+      syncLeetCodeSolvedProblems(userId, analytics.recentAcceptedSubmissions),
+    ]);
+
+    // --- NEW: Inject the historical calendar data AFTER real problems are saved ---
+    console.log(`[LEETCODE SERVICE] Syncing historical submission calendar...`);
+    const historicalCalendar = await syncHistoricalCalendar(userId, username, analytics.submissionCalendar);
+    console.log(`[LEETCODE SERVICE] Historical sync injected ${historicalCalendar.upserted} missing activity blocks.`);
+
+    return {
+      username: analytics.username,
+      solvedStats: analytics.solvedStats,
+      submissionCalendar: analytics.submissionCalendar,
+      ratingSnapshot,
+      solvedProblems,
+    };
+  } catch (error) {
+    console.error(`[LEETCODE SERVICE] ERROR during sync:`, error.message);
+    throw error;
+  }
+}
+
 async function fetchLeetCodeUpcomingContests() {
   const data = await fetchLeetCodeGraphQL(LEETCODE_UPCOMING_QUERY);
   
@@ -484,7 +457,7 @@ async function fetchLeetCodeUpcomingContests() {
   }
 
   return data.topTwoContests.map(c => ({
-    externalId: String(c.titleSlug), // <--- THE FIX: Wrapped in String()
+    externalId: String(c.titleSlug),
     platform: 'LEETCODE', 
     name: c.title,
     phase: "BEFORE",
@@ -496,28 +469,19 @@ async function fetchLeetCodeUpcomingContests() {
 
 async function syncLeetCodeContests() {
   console.log("[LEETCODE SERVICE] Starting LeetCode upcoming contests sync...");
-  
   try {
-    // Force a strict 10-second timeout
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("TIMEOUT: LeetCode Contests API request hung for 10s (Cloudflare block)")), 10000)
+      setTimeout(() => reject(new Error("TIMEOUT: LeetCode Contests API request hung for 10s")), 10000)
     );
 
-    // Race the API call against the timeout
     const rawContests = await Promise.race([
       fetchLeetCodeUpcomingContests(),
       timeoutPromise
     ]);
 
-    console.log("[LEETCODE SERVICE] Fetched LeetCode contests, count:", rawContests?.length);
-
-    if (!rawContests || rawContests.length === 0) {
-      console.log("[LEETCODE SERVICE] No contests returned from LeetCode API.");
-      return { created: 0, updated: 0, failed: 0 };
-    }
+    if (!rawContests || rawContests.length === 0) return { created: 0, updated: 0, failed: 0 };
 
     const results = { created: 0, updated: 0, failed: 0 };
-
     for (const contest of rawContests) {
       try {
         await prisma.contest.upsert({
@@ -527,16 +491,11 @@ async function syncLeetCodeContests() {
         });
         results.created += 1;
       } catch (err) {
-        console.log("[LEETCODE SERVICE] Failed to save contest:", contest.externalId, err.message);
         results.failed += 1;
       }
     }
-    
-    console.log("[LEETCODE SERVICE] Contest sync complete, results:", results);
     return results;
-    
   } catch (err) {
-    console.error("[LEETCODE SERVICE] CRITICAL ERROR in syncLeetCodeContests:", err.message);
     return { created: 0, updated: 0, failed: 0 };
   }
 }
