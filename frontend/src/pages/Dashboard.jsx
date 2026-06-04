@@ -40,8 +40,8 @@ export const Dashboard = () => {
       {/* --- THE FIX: Increased top to 100px to push it down below the line --- */}
       <div style={{
         position: 'absolute',
-        top: '175px',      // <-- Changed from 80px to 100px
-        right: '120px',    
+        top: '100px',      // <-- Changed from 80px to 100px
+        right: '80px',    
         background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(59, 130, 246, 0.15))',
         backdropFilter: 'blur(10px)',
         border: '1px solid rgba(168, 85, 247, 0.4)',
