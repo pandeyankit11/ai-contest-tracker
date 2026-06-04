@@ -3,14 +3,14 @@ import { useAuth } from '../context/AuthContext';
 import './Profile.css';
 
 const Profile = () => {
-  // Grab the token alongside the user for authenticated API requests
-  const { user, token } = useAuth();
+  // Grab the user directly from context. We don't even need the token here anymore!
+  const { user } = useAuth();
 
   // --- Local states for editing functionality ---
   const [isEditing, setIsEditing] = useState(false);
   const [username, setUsername] = useState(user?.username || "Ankit");
 
-  // --- NEW: State to hold dynamic platform statistics ---
+  // --- State to hold dynamic platform statistics ---
   const [stats, setStats] = useState({
     cfRating: 0,
     cfMaxRating: 0,
@@ -19,96 +19,44 @@ const Profile = () => {
     globalProblems: 0,
     globalContests: 0
   });
-  
-  // Optional loading state if you want to add skeleton loaders later
-  const [loading, setLoading] = useState(true);
 
-  // Keep the input text in sync if the user object loads late
+  // Whenever the user object loads or updates, extract the stats instantly
   useEffect(() => {
-    if (user?.username) {
-      setUsername(user.username);
+    if (user) {
+      setUsername(user.username || "Ankit");
+
+      // 1. Extract Codeforces Ratings from the Prisma ratingSnapshots array
+      const cfSnapshot = user.ratingSnapshots?.find(s => s.platform === 'CODEFORCES');
+      const cfRating = cfSnapshot?.rating || 0;
+      const cfMaxRating = cfSnapshot?.maxRating || 0;
+
+      // 2. Extract LeetCode Solved (Easy + Medium + Hard from platformStats)
+      const lcStats = user.platformStats?.find(s => s.platform === 'LEETCODE');
+      const lcSolved = lcStats ? (lcStats.easy + lcStats.medium + lcStats.hard) : 0;
+
+      // 3. Calculate Global Problems (Sum of all platforms)
+      const globalProblems = user.platformStats?.reduce((total, stat) => {
+        return total + (stat.easy || 0) + (stat.medium || 0) + (stat.hard || 0);
+      }, 0) || 0;
+
+      // 4. Set the UI State
+      setStats({
+        cfRating,
+        cfMaxRating,
+        lcSolved,
+        lcRecentContests: 0, // Set up later when contest participations are fetched
+        globalProblems,
+        globalContests: 0    // Set up later when contest participations are fetched
+      });
     }
   }, [user]);
 
-  // --- NEW: Fetch dynamic stats from the backend ---
-  // --- NEW: Fetch and calculate stats from known working endpoints ---
-  // --- NEW: Fetch and calculate stats using the exact backend schema ---
-  useEffect(() => {
-    const fetchProfileStats = async () => {
-      try {
-        const headers = { Authorization: `Bearer ${token}` };
-
-        const [ratingRes, difficultyRes] = await Promise.all([
-          fetch('/api/analytics/rating-history', { headers }),
-          fetch('/api/analytics/difficulty-breakdown', { headers })
-        ]);
-
-        if (!ratingRes.ok || !difficultyRes.ok) throw new Error("Failed to fetch");
-
-        const ratingJson = await ratingRes.json();
-        const difficultyJson = await difficultyRes.json();
-
-        const ratingData = ratingJson.data || {};
-        const difficultyData = difficultyJson.data || {};
-
-        let cfRating = 0, cfMaxRating = 0, cfContests = 0;
-        let lcSolved = 0, totalProbs = 0;
-
-        // 1. Map Codeforces Ratings (Using your exact backend keys)
-        if (ratingData.CODEFORCES) {
-          cfRating = ratingData.CODEFORCES.latestRating || 0;
-          cfMaxRating = ratingData.CODEFORCES.maxRating || 0;
-          // Count the history array for total contests
-          cfContests = ratingData.CODEFORCES.history ? ratingData.CODEFORCES.history.length : 0;
-        }
-
-        // 2. Map LeetCode & Global Problems
-        Object.keys(difficultyData).forEach(platform => {
-          const platformItems = difficultyData[platform];
-          let platformTotal = 0;
-          
-          // Since it's an array of objects [{ difficulty: 'Easy', count: X }, ...]
-          if (Array.isArray(platformItems)) {
-            platformTotal = platformItems.reduce((sum, item) => {
-              // Extract the numeric count (checking common key names)
-              return sum + (Number(item.count || item.value || item.solved || item.total) || 0);
-            }, 0);
-          }
-          
-          totalProbs += platformTotal;
-          
-          if (platform === 'LEETCODE') {
-            lcSolved = platformTotal;
-          }
-        });
-
-        // 3. Update the UI State
-        setStats({
-          cfRating: cfRating,
-          cfMaxRating: cfMaxRating,
-          lcSolved: lcSolved,
-          lcRecentContests: 0, 
-          globalProblems: totalProbs,
-          globalContests: cfContests 
-        });
-
-      } catch (error) {
-        console.error("Failed to load profile statistics", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (token) fetchProfileStats();
-  }, [token]);
-  
   const email = user?.email || "pandeyankit9a@gmail.com";
   const joinedDate = user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : "Just now";
 
   const handleEditClick = () => {
     if (isEditing) {
-      // TODO: In the deployment phase, add an axios/fetch PUT request 
-      // here to persist the username change in your database!
+      // TODO: Add an axios/fetch PUT request to persist name changes
       console.log("Saved name locally:", username);
     }
     setIsEditing(!isEditing);
@@ -152,11 +100,11 @@ const Profile = () => {
           <div className="stat-body">
             <div className="stat-item">
               <span className="stat-label">Rating</span>
-              <span className="stat-value">{loading ? "..." : stats.cfRating}</span>
+              <span className="stat-value">{!user ? "..." : stats.cfRating}</span>
             </div>
             <div className="stat-item">
               <span className="stat-label">Max Rating</span>
-              <span className="stat-value">{loading ? "..." : stats.cfMaxRating}</span>
+              <span className="stat-value">{!user ? "..." : stats.cfMaxRating}</span>
             </div>
           </div>
         </div>
@@ -170,11 +118,11 @@ const Profile = () => {
           <div className="stat-body">
             <div className="stat-item">
               <span className="stat-label">Total Solved</span>
-              <span className="stat-value">{loading ? "..." : stats.lcSolved}</span>
+              <span className="stat-value">{!user ? "..." : stats.lcSolved}</span>
             </div>
             <div className="stat-item">
               <span className="stat-label">Recent Contests</span>
-              <span className="stat-value">{loading ? "..." : stats.lcRecentContests}</span>
+              <span className="stat-value">{!user ? "..." : stats.lcRecentContests}</span>
             </div>
           </div>
         </div>
@@ -187,11 +135,11 @@ const Profile = () => {
           <div className="stat-body">
             <div className="stat-item">
               <span className="stat-label">Total Problems</span>
-              <span className="stat-value text-blue">{loading ? "..." : stats.globalProblems}</span> 
+              <span className="stat-value text-blue">{!user ? "..." : stats.globalProblems}</span> 
             </div>
             <div className="stat-item">
               <span className="stat-label">Total Contests</span>
-              <span className="stat-value text-blue">{loading ? "..." : stats.globalContests}</span>
+              <span className="stat-value text-blue">{!user ? "..." : stats.globalContests}</span>
             </div>
           </div>
         </div>
