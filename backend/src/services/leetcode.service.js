@@ -1,239 +1,524 @@
 const { prisma } = require("../config/prisma");
+const { AppError } = require("../utils/AppError");
 
-// CACHE BUSTER
-console.log("[SYSTEM] analytics.service.js initialized. Null-safe charts active.");
+const LEETCODE_GRAPHQL_URL = "https://leetcode.com/graphql";
+const LEETCODE_PLATFORM = "LEETCODE";
+const DEFAULT_RECENT_SUBMISSION_LIMIT = 100;
 
-async function getRatingHistory(userId) {
-  const snapshots = await prisma.ratingSnapshot.findMany({
-    where: { userId },
-    orderBy: [{ recordedAt: "asc" }],
-    select: {
-      platform: true,
-      rating: true,
-      maxRating: true,
-      recordedAt: true,
+const LEETCODE_USER_ANALYTICS_QUERY = `
+query userAnalytics($username: String!, $recentLimit: Int!) {
+  matchedUser(username: $username) {
+    username
+    submitStats: submitStatsGlobal {
+      acSubmissionNum {
+        difficulty
+        count
+        submissions
+      }
+    }
+    submissionCalendar
+    tagProblemCounts {
+      advanced { tagName problemsSolved }
+      intermediate { tagName problemsSolved }
+      fundamental { tagName problemsSolved }
+    }
+  }
+  recentAcSubmissionList(username: $username, limit: $recentLimit) {
+    id
+    title
+    titleSlug
+    timestamp
+  }
+  userContestRanking(username: $username) {
+    attendedContestsCount
+    rating
+    globalRanking
+    totalParticipants
+    topPercentage
+  }
+}
+`;
+
+const LEETCODE_QUESTION_QUERY = `
+query questionData($titleSlug: String!) {
+  question(titleSlug: $titleSlug) {
+    questionId
+    title
+    titleSlug
+    difficulty
+    topicTags {
+      name
+      slug
+    }
+  }
+}
+`;
+
+const LEETCODE_UPCOMING_QUERY = `
+query topTwoContests {
+  topTwoContests {
+    title
+    titleSlug
+    startTime
+    duration
+  }
+}
+`;
+
+let fetchImplementation = (...args) => globalThis.fetch(...args);
+
+function setLeetCodeFetchImplementation(nextFetchImplementation) {
+  fetchImplementation = nextFetchImplementation;
+}
+
+function resetLeetCodeFetchImplementation() {
+  fetchImplementation = (...args) => globalThis.fetch(...args);
+}
+
+function validateLeetCodeUsername(username) {
+  if (typeof username !== "string" || username.trim().length === 0) {
+    throw new AppError("LeetCode username is missing", 422, "LEETCODE_USERNAME_MISSING");
+  }
+  return username.trim();
+}
+
+function normalizeNumber(value) {
+  return Number.isFinite(value) ? value : null;
+}
+
+function normalizeInteger(value) {
+  return Number.isFinite(value) ? Math.round(value) : null;
+}
+
+function assertValidFetchResponse(response) {
+  const isValidResponse =
+    response &&
+    typeof response === "object" &&
+    typeof response.status === "number" &&
+    typeof response.ok === "boolean" &&
+    typeof response.json === "function";
+
+  if (!isValidResponse) {
+    throw new AppError("LeetCode returned an invalid HTTP response", 502, "LEETCODE_INVALID_RESPONSE");
+  }
+}
+
+async function fetchLeetCodeGraphQL(query, variables = {}) {
+  const response = await fetch('https://leetcode.com/graphql', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': '*/*',
+      'Referer': 'https://leetcode.com/'
     },
+    body: JSON.stringify({ query, variables })
   });
 
-  const groupedByPlatform = {};
+  if (!response.ok) {
+    throw new Error(`LeetCode GraphQL API returned ${response.status}`);
+  }
 
-  snapshots.forEach((snapshot) => {
-    if (!snapshot || !snapshot.recordedAt) return; // Prevent date crashes
+  const result = await response.json();
+  return result.data;
+}
 
-    if (!groupedByPlatform[snapshot.platform]) {
-      groupedByPlatform[snapshot.platform] = { history: [], latestRating: null, maxRating: 0 };
+function parseSubmissionCalendar(value) {
+  if (!value) return {};
+  if (typeof value === "object" && !Array.isArray(value)) return value;
+  if (typeof value !== "string") return {};
+
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch (_error) {
+    return {};
+  }
+}
+
+function formatSolvedStats(acSubmissionNum = []) {
+  const statsByDifficulty = new Map(
+    acSubmissionNum
+      .filter((entry) => entry && typeof entry.difficulty === "string")
+      .map((entry) => [entry.difficulty.toLowerCase(), normalizeInteger(entry.count) || 0])
+  );
+
+  return {
+    totalSolved: statsByDifficulty.get("all") || 0,
+    easySolved: statsByDifficulty.get("easy") || 0,
+    mediumSolved: statsByDifficulty.get("medium") || 0,
+    hardSolved: statsByDifficulty.get("hard") || 0,
+  };
+}
+
+function formatUserAnalytics(data) {
+  const acSubmissionNum = data.matchedUser.submitStats?.acSubmissionNum;
+
+  return {
+    username: data.matchedUser.username,
+    solvedStats: formatSolvedStats(Array.isArray(acSubmissionNum) ? acSubmissionNum : []),
+    submissionCalendar: parseSubmissionCalendar(data.matchedUser.submissionCalendar),
+    recentAcceptedSubmissions: Array.isArray(data.recentAcSubmissionList) ? data.recentAcSubmissionList : [],
+    contestRanking: data.userContestRanking || null,
+    tagProblemCounts: data.matchedUser.tagProblemCounts || null, 
+  };
+}
+
+async function fetchLeetCodeUserAnalytics(username, { recentLimit } = {}) {
+  const validUsername = validateLeetCodeUsername(username);
+  const data = await fetchLeetCodeGraphQL(LEETCODE_USER_ANALYTICS_QUERY, {
+    username: validUsername,
+    recentLimit: recentLimit || DEFAULT_RECENT_SUBMISSION_LIMIT,
+  });
+
+  return formatUserAnalytics(data);
+}
+
+async function fetchLeetCodeQuestion(titleSlug) {
+  const data = await fetchLeetCodeGraphQL(LEETCODE_QUESTION_QUERY, {
+    titleSlug: titleSlug.trim(),
+  });
+  return data.question;
+}
+
+function formatLeetCodeRatingSnapshot(userId, contestRanking, recordedAt) {
+  const rating = normalizeInteger(contestRanking?.rating);
+  if (rating === null) return null;
+
+  return {
+    userId,
+    platform: LEETCODE_PLATFORM,
+    rating,
+    maxRating: rating,
+    rank: Number.isFinite(contestRanking.globalRanking) ? String(contestRanking.globalRanking) : null,
+    recordedAt,
+  };
+}
+
+async function syncLeetCodeRatingSnapshot(userId, contestRanking, recordedAt) {
+  const snapshot = formatLeetCodeRatingSnapshot(userId, contestRanking, recordedAt);
+  if (!snapshot) return { processed: 0, upserted: 0, failed: 0 };
+
+  try {
+    await prisma.ratingSnapshot.upsert({
+      where: {
+        userId_platform_recordedAt: {
+          userId: snapshot.userId,
+          platform: snapshot.platform,
+          recordedAt: snapshot.recordedAt,
+        },
+      },
+      update: {
+        rating: snapshot.rating,
+        maxRating: snapshot.maxRating,
+        rank: snapshot.rank,
+      },
+      create: snapshot,
+    });
+    return { processed: 1, upserted: 1, failed: 0 };
+  } catch (_error) {
+    return { processed: 0, upserted: 0, failed: 1 };
+  }
+}
+
+function normalizeTopicTags(topicTags) {
+  if (!Array.isArray(topicTags)) return [];
+  return topicTags.map((tag) => tag?.name).filter((name) => typeof name === "string" && name.trim().length > 0);
+}
+
+function formatLeetCodeSolvedProblem(userId, submission, question) {
+  const titleSlug = submission.titleSlug.trim();
+  const title = question?.title || submission.title;
+
+  return {
+    userId,
+    contestId: null,
+    platform: LEETCODE_PLATFORM,
+    externalId: titleSlug,
+    name: title,
+    url: `https://leetcode.com/problems/${titleSlug}/`,
+    tags: normalizeTopicTags(question?.topicTags),
+    difficulty: typeof question?.difficulty === "string" ? question.difficulty : null,
+    rating: null,
+    solvedAt: new Date(Number(submission.timestamp) * 1000),
+  };
+}
+
+async function syncLeetCodeSolvedProblems(userId, recentAcceptedSubmissions) {
+  const uniqueSubmissions = new Map();
+  const results = { processed: 0, upserted: 0, failed: 0 };
+
+  for (const submission of recentAcceptedSubmissions) {
+    if (!submission || typeof submission.titleSlug !== "string") {
+      results.failed += 1;
+      continue;
     }
-    
+
+    const existingSubmission = uniqueSubmissions.get(submission.titleSlug);
+    const submissionTimestamp = Number(submission.timestamp);
+    const existingTimestamp = Number(existingSubmission?.timestamp);
+
+    if (!existingSubmission || submissionTimestamp < existingTimestamp) {
+      uniqueSubmissions.set(submission.titleSlug, submission);
+    }
+  }
+
+  for (const submission of uniqueSubmissions.values()) {
     try {
-      groupedByPlatform[snapshot.platform].history.push({
-        date: snapshot.recordedAt.toISOString().split("T")[0],
-        rating: snapshot.rating || 0,
-        maxRating: snapshot.maxRating || 0,
+      const question = await fetchLeetCodeQuestion(submission.titleSlug);
+      const solvedProblem = formatLeetCodeSolvedProblem(userId, submission, question);
+
+      await prisma.solvedProblem.upsert({
+        where: {
+          userId_platform_externalId: {
+            userId: solvedProblem.userId,
+            platform: solvedProblem.platform,
+            externalId: solvedProblem.externalId,
+          },
+        },
+        update: {
+          name: solvedProblem.name,
+          url: solvedProblem.url,
+          tags: solvedProblem.tags,
+          difficulty: solvedProblem.difficulty,
+          rating: solvedProblem.rating,
+          solvedAt: solvedProblem.solvedAt,
+        },
+        create: solvedProblem,
       });
-    } catch (err) {
-      console.warn(`[ANALYTICS] Invalid date on rating snapshot:`, err.message);
+
+      results.processed += 1;
+      results.upserted += 1;
+    } catch (_error) {
+      results.failed += 1;
     }
-  });
+  }
 
-  Object.keys(groupedByPlatform).forEach((platform) => {
-    const history = groupedByPlatform[platform].history;
-    groupedByPlatform[platform].latestRating = history[history.length - 1]?.rating || null;
-    groupedByPlatform[platform].maxRating = Math.max(...history.map((r) => r.maxRating || r.rating || 0), 0);
-  });
-
-  return groupedByPlatform;
+  return results;
 }
 
-async function getDifficultyBreakdown(userId) {
-  const [problems, stats] = await Promise.all([
-    prisma.solvedProblem.findMany({
-      where: { userId },
-      select: { platform: true, difficulty: true, rating: true },
-    }),
-    prisma.platformStats.findMany({
-      where: { userId },
-    }),
-  ]);
+// --- THE FIX: We added a try/catch and a safe past date so Prisma doesn't crash ---
+async function syncTopicAggregator(userId, username, tagProblemCounts) {
+  if (!tagProblemCounts) return;
 
-  const result = {};
-
-  stats.forEach((stat) => {
-    if (!stat) return;
-    result[stat.platform] = [
-      { name: 'easy', count: stat.easy || 0 },
-      { name: 'medium', count: stat.medium || 0 },
-      { name: 'hard', count: stat.hard || 0 },
-    ];
-  });
-
-  const tempGroups = {};
-
-  problems.forEach((problem) => {
-    if (!problem) return;
-    if (problem.platform === "LEETCODE" && result["LEETCODE"]) return;
-
-    if (!tempGroups[problem.platform]) {
-      tempGroups[problem.platform] = {};
-    }
-
-    let diffKey = "unknown";
-    
-    // --- THE FIX 1: Explicitly handle unrated Codeforces problems ---
-    if (problem.platform === "CODEFORCES") {
-      diffKey = problem.rating ? problem.rating.toString() : "Unrated";
-    } else if (problem.difficulty && typeof problem.difficulty === 'string') {
-      diffKey = problem.difficulty.toLowerCase();
-    }
-
-    if (!tempGroups[problem.platform][diffKey]) {
-      tempGroups[problem.platform][diffKey] = 0;
-    }
-    tempGroups[problem.platform][diffKey] += 1;
-  });
-
-  Object.entries(tempGroups).forEach(([platform, counts]) => {
-    result[platform] = Object.entries(counts)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => {
-        // Keep sorting numerical ratings, but push "Unrated" to the end
-        if (a.name === "Unrated") return 1;
-        if (b.name === "Unrated") return -1;
-        if (!isNaN(a.name) && !isNaN(b.name)) return Number(a.name) - Number(b.name);
-        return 0;
-      });
-  });
-
-  return result;
-}
-
-async function getTopicBreakdown(userId) {
-  const problems = await prisma.solvedProblem.findMany({
-    where: { userId },
-    select: { platform: true, tags: true },
-  });
-
-  const groupedByPlatform = {};
-
-  problems.forEach((problem) => {
-    if (!problem) return;
-    if (!groupedByPlatform[problem.platform]) groupedByPlatform[problem.platform] = {};
-
-    if (Array.isArray(problem.tags)) {
-      problem.tags.forEach((tag) => {
-        if (typeof tag === 'string') {
-          groupedByPlatform[problem.platform][tag] = (groupedByPlatform[problem.platform][tag] || 0) + 1;
+  const allTags = [];
+  const categories = ['advanced', 'intermediate', 'fundamental'];
+  
+  categories.forEach(cat => {
+    if (Array.isArray(tagProblemCounts[cat])) {
+      tagProblemCounts[cat].forEach(tagObj => {
+        const count = tagObj.problemsSolved || 0;
+        for (let i = 0; i < count; i++) {
+          allTags.push(tagObj.tagName);
         }
       });
     }
   });
 
-  const result = {};
-  Object.entries(groupedByPlatform).forEach(([platform, tags]) => {
-    result[platform] = Object.entries(tags)
-      .map(([topic, count]) => ({ topic, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 15);
-  });
-
-  return result;
+  if (allTags.length > 0) {
+    try {
+      await prisma.solvedProblem.upsert({
+        where: {
+          userId_platform_externalId: {
+            userId,
+            platform: LEETCODE_PLATFORM,
+            externalId: 'lc-topics-aggregator' 
+          }
+        },
+        update: {
+          name: 'LeetCode All-Time Topics',
+          tags: allTags,
+        },
+        create: {
+          userId,
+          platform: LEETCODE_PLATFORM,
+          externalId: 'lc-topics-aggregator',
+          name: 'LeetCode All-Time Topics',
+          url: `https://leetcode.com/${username}`,
+          tags: allTags,
+          difficulty: null,
+          rating: null,
+          solvedAt: new Date('2000-01-01') // A valid date so it saves successfully!
+        }
+      });
+    } catch (error) {
+      console.error("[LEETCODE SERVICE] Failed to sync topic aggregator:", error.message);
+    }
+  }
 }
 
-async function getActivity(userId) {
-  const problems = await prisma.solvedProblem.findMany({
-    where: { userId },
-    select: { platform: true, solvedAt: true },
-    orderBy: { solvedAt: "asc" },
-  });
+async function syncHistoricalCalendar(userId, username, submissionCalendar) {
+  if (!submissionCalendar || Object.keys(submissionCalendar).length === 0) return { upserted: 0 };
+  const results = { upserted: 0, failed: 0 };
 
-  const groupedByPlatform = {};
+  try {
+    const existingLC = await prisma.solvedProblem.findMany({
+      where: { userId, platform: LEETCODE_PLATFORM },
+      select: { externalId: true, solvedAt: true }
+    });
 
-  problems.forEach((problem) => {
-    if (!problem || !problem.solvedAt) return; // Prevent date crash
-
-    if (!groupedByPlatform[problem.platform]) groupedByPlatform[problem.platform] = {};
-
-    try {
-      const dateKey = problem.solvedAt.toISOString().split("T")[0];
-      groupedByPlatform[problem.platform][dateKey] = (groupedByPlatform[problem.platform][dateKey] || 0) + 1;
-    } catch (err) {
-      console.warn(`[ANALYTICS] Invalid date on activity map:`, err.message);
+    const existingByDate = {};
+    for (const p of existingLC) {
+      if (!p.solvedAt) continue;
+      const dKey = p.solvedAt.toISOString().split("T")[0];
+      existingByDate[dKey] = (existingByDate[dKey] || 0) + 1;
     }
-  });
 
-  const result = {};
-  Object.entries(groupedByPlatform).forEach(([platform, dates]) => {
-    result[platform] = Object.entries(dates).map(([date, count]) => ({ date, count }));
-  });
+    const dummyProblems = [];
+    for (const [timestampStr, count] of Object.entries(submissionCalendar)) {
+      const timestamp = parseInt(timestampStr, 10);
+      if (isNaN(timestamp)) continue;
 
-  return result;
+      const dateObj = new Date(timestamp * 1000);
+      const dKey = dateObj.toISOString().split("T")[0];
+
+      const existingCount = existingByDate[dKey] || 0;
+      const missingCount = count - existingCount;
+
+      if (missingCount > 0) {
+        for (let i = 0; i < missingCount; i++) {
+          dummyProblems.push({
+            userId,
+            platform: LEETCODE_PLATFORM,
+            externalId: `lc-historical-${dKey}-${existingCount + i}`,
+            name: "Historical Activity",
+            url: `https://leetcode.com/${username}`, 
+            tags: [],
+            difficulty: null,
+            rating: null,
+            solvedAt: dateObj
+          });
+        }
+      }
+    }
+
+    if (dummyProblems.length > 0) {
+      await prisma.solvedProblem.createMany({
+        data: dummyProblems,
+        skipDuplicates: true
+      });
+      results.upserted = dummyProblems.length;
+    }
+  } catch (error) {
+    results.failed = 1;
+  }
+
+  return results;
 }
 
-async function getSolvedTrends(userId) {
-  const [problems, stats] = await Promise.all([
-    prisma.solvedProblem.findMany({
-      where: { userId },
-      select: { platform: true, solvedAt: true },
-      orderBy: { solvedAt: "asc" },
-    }),
-    prisma.platformStats.findMany({
-      where: { userId },
-    }),
-  ]);
-
-  const groupedByPlatform = {};
-  const cumulativeCounts = {};
-  const platformOffsets = {};
-
-  // --- THE FIX 2: Calculate missing dates into the baseline offset ---
-  stats.forEach(stat => {
-    if (!stat) return;
-    
-    // Count ALL problems in the DB, even the 3 without dates
-    const totalInDB = problems.filter(p => p && p.platform === stat.platform).length;
-    // Count ONLY the problems that can actually be drawn on the chart
-    const totalWithDates = problems.filter(p => p && p.platform === stat.platform && p.solvedAt).length;
-    
-    // Use true total from stats if available, otherwise trust the DB total
-    const totalAggregate = stat.totalSolved || ((stat.easy || 0) + (stat.medium || 0) + (stat.hard || 0)) || totalInDB;
-    
-    // The offset becomes the difference. (e.g. 97 total - 94 with dates = 3 baseline offset)
-    if (totalAggregate > totalWithDates) {
-      platformOffsets[stat.platform] = totalAggregate - totalWithDates;
-    } else {
-      platformOffsets[stat.platform] = 0;
-    }
+async function syncPlatformStats(userId, solvedStats) {
+  await prisma.platformStats.upsert({
+    where: { 
+      userId_platform: { userId, platform: LEETCODE_PLATFORM } 
+    },
+    update: {
+      easy: solvedStats.easySolved,
+      medium: solvedStats.mediumSolved,
+      hard: solvedStats.hardSolved,
+    },
+    create: {
+      userId,
+      platform: LEETCODE_PLATFORM,
+      easy: solvedStats.easySolved,
+      medium: solvedStats.mediumSolved,
+      hard: solvedStats.hardSolved,
+    },
   });
+}
 
-  problems.forEach((problem) => {
-    if (!problem || !problem.solvedAt) return; 
+async function syncLeetCodeAnalytics(userId, username, options = {}) {
+  const recordedAt = options.recordedAt || new Date();
 
-    if (!groupedByPlatform[problem.platform]) {
-      groupedByPlatform[problem.platform] = new Map();
-      // Initialize the count with our calculated offset (e.g. starts at 3 instead of 0)
-      cumulativeCounts[problem.platform] = platformOffsets[problem.platform] || 0;
+  try {
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("TIMEOUT: LeetCode API request hung for 10 seconds")), 10000)
+    );
+
+    const analytics = await Promise.race([
+      fetchLeetCodeUserAnalytics(username, { recentLimit: options.recentLimit }),
+      timeoutPromise
+    ]);
+
+    await syncPlatformStats(userId, analytics.solvedStats);
+
+    const [ratingSnapshot, solvedProblems] = await Promise.all([
+      syncLeetCodeRatingSnapshot(userId, analytics.contestRanking, recordedAt),
+      syncLeetCodeSolvedProblems(userId, analytics.recentAcceptedSubmissions),
+    ]);
+
+    const historicalCalendar = await syncHistoricalCalendar(userId, username, analytics.submissionCalendar);
+    
+    await syncTopicAggregator(userId, username, analytics.tagProblemCounts);
+
+    return {
+      username: analytics.username,
+      solvedStats: analytics.solvedStats,
+      submissionCalendar: analytics.submissionCalendar,
+      ratingSnapshot,
+      solvedProblems,
+    };
+  } catch (error) {
+    throw error;
+  }
+}
+
+async function fetchLeetCodeUpcomingContests() {
+  const data = await fetchLeetCodeGraphQL(LEETCODE_UPCOMING_QUERY);
+  if (!data || !Array.isArray(data.topTwoContests)) return [];
+
+  return data.topTwoContests.map(c => ({
+    externalId: String(c.titleSlug),
+    platform: 'LEETCODE', 
+    name: c.title,
+    phase: "BEFORE",
+    startTime: new Date(c.startTime * 1000),
+    endTime: new Date((c.startTime + c.duration) * 1000),
+    durationSeconds: c.duration,
+  }));
+}
+
+async function syncLeetCodeContests() {
+  try {
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("TIMEOUT: LeetCode Contests API request hung for 10s")), 10000)
+    );
+    const rawContests = await Promise.race([
+      fetchLeetCodeUpcomingContests(),
+      timeoutPromise
+    ]);
+
+    if (!rawContests || rawContests.length === 0) return { created: 0, updated: 0, failed: 0 };
+    const results = { created: 0, updated: 0, failed: 0 };
+    for (const contest of rawContests) {
+      try {
+        await prisma.contest.upsert({
+          where: { platform_externalId: { platform: 'LEETCODE', externalId: contest.externalId } },
+          update: { phase: contest.phase },
+          create: contest,
+        });
+        results.created += 1;
+      } catch (err) {
+        results.failed += 1;
+      }
     }
-
-    try {
-      const dateKey = problem.solvedAt.toISOString().split("T")[0];
-      cumulativeCounts[problem.platform] += 1; 
-      groupedByPlatform[problem.platform].set(dateKey, cumulativeCounts[problem.platform]);
-    } catch (err) {
-      console.warn(`[ANALYTICS] Invalid date on trends map:`, err.message);
-    }
-  });
-
-  const result = {};
-  Object.entries(groupedByPlatform).forEach(([platform, dateMap]) => {
-    result[platform] = Array.from(dateMap.entries()).map(([date, count]) => ({ date, count }));
-  });
-
-  return result;
+    return results;
+  } catch (err) {
+    return { created: 0, updated: 0, failed: 0 };
+  }
 }
 
 module.exports = {
-  getRatingHistory,
-  getDifficultyBreakdown,
-  getTopicBreakdown,
-  getActivity,
-  getSolvedTrends,
+  DEFAULT_RECENT_SUBMISSION_LIMIT,
+  LEETCODE_GRAPHQL_URL,
+  LEETCODE_PLATFORM,
+  LEETCODE_QUESTION_QUERY,
+  LEETCODE_USER_ANALYTICS_QUERY,
+  fetchLeetCodeGraphQL,
+  fetchLeetCodeQuestion,
+  fetchLeetCodeUserAnalytics,
+  resetLeetCodeFetchImplementation,
+  setLeetCodeFetchImplementation,
+  syncLeetCodeAnalytics,
+  fetchLeetCodeUpcomingContests,
+  syncLeetCodeContests,
 };

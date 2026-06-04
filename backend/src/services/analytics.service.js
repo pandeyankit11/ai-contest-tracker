@@ -18,7 +18,7 @@ async function getRatingHistory(userId) {
   const groupedByPlatform = {};
 
   snapshots.forEach((snapshot) => {
-    if (!snapshot || !snapshot.recordedAt) return; // Prevent date crashes
+    if (!snapshot || !snapshot.recordedAt) return; 
 
     if (!groupedByPlatform[snapshot.platform]) {
       groupedByPlatform[snapshot.platform] = { history: [], latestRating: null, maxRating: 0 };
@@ -30,9 +30,7 @@ async function getRatingHistory(userId) {
         rating: snapshot.rating || 0,
         maxRating: snapshot.maxRating || 0,
       });
-    } catch (err) {
-      console.warn(`[ANALYTICS] Invalid date on rating snapshot:`, err.message);
-    }
+    } catch (err) {}
   });
 
   Object.keys(groupedByPlatform).forEach((platform) => {
@@ -107,17 +105,24 @@ async function getDifficultyBreakdown(userId) {
 async function getTopicBreakdown(userId) {
   const problems = await prisma.solvedProblem.findMany({
     where: { userId },
-    select: { platform: true, tags: true, externalId: true }, // --- THE FIX 3: Select the external ID! ---
+    select: { platform: true, tags: true, externalId: true }, 
   });
 
-  const groupedByPlatform = {};
+  // --- THE UI FIX: Pre-fill platforms so the UI card never vanishes ---
+  const groupedByPlatform = {
+    CODEFORCES: {},
+    LEETCODE: {} 
+  };
+
+  const hasLCAggregator = problems.some(p => p.externalId === 'lc-topics-aggregator');
 
   problems.forEach((problem) => {
     if (!problem) return;
     
-    // --- THE FIX 4: Ignore normal LeetCode problems so we don't double count. ONLY read the magic aggregator! ---
-    if (problem.platform === 'LEETCODE' && problem.externalId !== 'lc-topics-aggregator') {
-      return; 
+    if (problem.platform === 'LEETCODE') {
+      // If we have the magic aggregator, use it and ignore normal ones. 
+      // If we DON'T have it yet, fall back to normal counting.
+      if (hasLCAggregator && problem.externalId !== 'lc-topics-aggregator') return;
     }
 
     if (!groupedByPlatform[problem.platform]) groupedByPlatform[problem.platform] = {};
@@ -145,23 +150,24 @@ async function getTopicBreakdown(userId) {
 async function getActivity(userId) {
   const problems = await prisma.solvedProblem.findMany({
     where: { userId },
-    select: { platform: true, solvedAt: true },
+    select: { platform: true, solvedAt: true, externalId: true }, 
     orderBy: { solvedAt: "asc" },
   });
 
   const groupedByPlatform = {};
 
   problems.forEach((problem) => {
-    if (!problem || !problem.solvedAt) return; // Prevent date crash
+    if (!problem || !problem.solvedAt) return; 
+    
+    // --- EXCLUDE THE AGGREGATOR FROM THE HEATMAP ---
+    if (problem.externalId === 'lc-topics-aggregator') return;
 
     if (!groupedByPlatform[problem.platform]) groupedByPlatform[problem.platform] = {};
 
     try {
       const dateKey = problem.solvedAt.toISOString().split("T")[0];
       groupedByPlatform[problem.platform][dateKey] = (groupedByPlatform[problem.platform][dateKey] || 0) + 1;
-    } catch (err) {
-      console.warn(`[ANALYTICS] Invalid date on activity map:`, err.message);
-    }
+    } catch (err) {}
   });
 
   const result = {};
@@ -176,7 +182,7 @@ async function getSolvedTrends(userId) {
   const [problems, stats] = await Promise.all([
     prisma.solvedProblem.findMany({
       where: { userId },
-      select: { platform: true, solvedAt: true },
+      select: { platform: true, solvedAt: true, externalId: true }, 
       orderBy: { solvedAt: "asc" },
     }),
     prisma.platformStats.findMany({
@@ -188,11 +194,14 @@ async function getSolvedTrends(userId) {
   const cumulativeCounts = {};
   const platformOffsets = {};
 
+  // --- EXCLUDE THE AGGREGATOR FROM THE TRENDS CHART ---
+  const validProblems = problems.filter(p => p && p.externalId !== 'lc-topics-aggregator');
+
   stats.forEach(stat => {
     if (!stat) return;
     
-    const totalInDB = problems.filter(p => p && p.platform === stat.platform).length;
-    const totalWithDates = problems.filter(p => p && p.platform === stat.platform && p.solvedAt).length;
+    const totalInDB = validProblems.filter(p => p.platform === stat.platform).length;
+    const totalWithDates = validProblems.filter(p => p.platform === stat.platform && p.solvedAt).length;
     const totalAggregate = stat.totalSolved || ((stat.easy || 0) + (stat.medium || 0) + (stat.hard || 0)) || totalInDB;
     
     if (totalAggregate > totalWithDates) {
@@ -202,8 +211,8 @@ async function getSolvedTrends(userId) {
     }
   });
 
-  problems.forEach((problem) => {
-    if (!problem || !problem.solvedAt) return; 
+  validProblems.forEach((problem) => {
+    if (!problem.solvedAt) return; 
 
     if (!groupedByPlatform[problem.platform]) {
       groupedByPlatform[problem.platform] = new Map();
@@ -214,9 +223,7 @@ async function getSolvedTrends(userId) {
       const dateKey = problem.solvedAt.toISOString().split("T")[0];
       cumulativeCounts[problem.platform] += 1; 
       groupedByPlatform[problem.platform].set(dateKey, cumulativeCounts[problem.platform]);
-    } catch (err) {
-      console.warn(`[ANALYTICS] Invalid date on trends map:`, err.message);
-    }
+    } catch (err) {}
   });
 
   const result = {};
