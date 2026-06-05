@@ -77,9 +77,46 @@ const getTotalUsers = asyncHandler(async (req, res) => {
   });
 });
 
+// --- NEW endpoint inside auth.controller.js ---
+const updateProfile = asyncHandler(async (req, res) => {
+  const { username } = req.body;
+
+  if (!username || username.trim().length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Username cannot be empty",
+    });
+  }
+
+  // Persist the new username directly to the Neon database
+  const updatedUser = await prisma.user.update({
+    where: { id: req.user.id },
+    data: { username: username.trim() },
+    include: {
+      contestAccounts: true,
+      platformStats: true,
+      ratingSnapshots: true,
+      solvedProblems: true,
+      contestParticipations: true,
+    },
+  });
+
+  // Strip out the password hash before sending the updated record back
+  const { password, ...safeUser } = updatedUser;
+
+  res.status(200).json({
+    success: true,
+    message: "Profile updated successfully",
+    data: { user: safeUser },
+  });
+});
+
+// Don't forget to export updateProfile at the bottom of the file!
+
 module.exports = {
   login,
   me,
   register,
   getTotalUsers, 
+  updateProfile,
 };

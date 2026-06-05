@@ -3,12 +3,17 @@ import { useAuth } from '../context/AuthContext';
 import './Profile.css';
 
 const Profile = () => {
-  // Grab the user directly from context. We don't even need the token here anymore!
+  // Assuming your AuthContext provides an login/update utility or you can re-fetch
   const { user } = useAuth();
 
   // --- Local states for editing functionality ---
   const [isEditing, setIsEditing] = useState(false);
-  const [username, setUsername] = useState(user?.username || "Ankit");
+  
+  // Clean fallback: Use their username, or extract a handle from their email if username is blank
+  const defaultName = user?.username || user?.email?.split('@')[0] || "User";
+  const [username, setUsername] = useState(defaultName);
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   // --- State to hold dynamic platform statistics ---
   const [stats, setStats] = useState({
@@ -20,12 +25,11 @@ const Profile = () => {
     globalContests: 0
   });
 
-  // Whenever the user object loads or updates, extract the stats instantly
-  // Whenever the user object loads or updates, extract the stats instantly
-  // Whenever the user object loads or updates, extract the stats instantly
+  // Sync state whenever the global user context updates or finishes fetching
   useEffect(() => {
     if (user) {
-      setUsername(user.username || "Ankit");
+      const currentName = user.username || user.email?.split('@')[0] || "User";
+      setUsername(currentName);
 
       // 1. Extract Codeforces Ratings (Sorted to get the LATEST rating)
       const cfSnapshots = user.ratingSnapshots
@@ -41,7 +45,6 @@ const Profile = () => {
       const lcSolved = lcStats ? (lcStats.easy + lcStats.medium + lcStats.hard) : 0;
       
       const cfSolved = user.solvedProblems?.filter(p => p.platform === 'CODEFORCES').length || 0;
-
       const globalProblems = lcSolved + cfSolved;
 
       // 3. Count Contests (Filtering the contestParticipations array)
@@ -59,15 +62,58 @@ const Profile = () => {
       });
     }
   }, [user]);
-  const email = user?.email || "pandeyankit9a@gmail.com";
+
+  const email = user?.email || "No email available";
   const joinedDate = user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : "Just now";
 
-  const handleEditClick = () => {
+  const handleEditClick = async () => {
     if (isEditing) {
-      // TODO: Add an axios/fetch PUT request to persist name changes
-      console.log("Saved name locally:", username);
+      // Don't issue a network request if the name hasn't changed
+      const currentName = user?.username || user?.email?.split('@')[0] || "User";
+      if (username.trim() === currentName) {
+        setIsEditing(false);
+        return;
+      }
+
+      setIsSaving(true);
+      setErrorMsg('');
+
+      try {
+        // Replace with your actual base URL or axios instance configuration
+        const token = localStorage.getItem('token'); 
+        const response = await fetch('/api/auth/update-profile', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ username: username.trim() })
+        });
+
+        const resData = await response.json();
+
+        if (!response.ok) {
+          throw new Error(resData.message || "Failed to update profile name on the server.");
+        }
+
+        console.log("Database updated successfully:", resData.data.user.username);
+        
+        // CRITICAL: If your useAuth() context provides a way to update global state without forcing a hard reload,
+        // you would trigger it here so the entire app synchronizes instantly, e.g.:
+        // if (updateUserContext) updateUserContext(resData.data.user);
+        
+        setIsEditing(false);
+      } catch (err) {
+        console.error("PROFILE_UPDATE_ERROR:", err.message);
+        setErrorMsg(err.message || "Connection error. Reverting change locally.");
+        // Optional fallback: Reset string back to context value on failure
+        setUsername(currentName);
+      } finally {
+        setIsSaving(false);
+      }
+    } else {
+      setIsEditing(true);
     }
-    setIsEditing(!isEditing);
   };
 
   return (
@@ -83,6 +129,7 @@ const Profile = () => {
               className="profile-name-input"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              disabled={isSaving}
               autoFocus
             />
           ) : (
@@ -90,9 +137,14 @@ const Profile = () => {
           )}
           <p className="profile-email">{email}</p>
           <span className="profile-joined">Joined: {joinedDate}</span>
+          {errorMsg && <p style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{errorMsg}</p>}
         </div>
-        <button className="btn-edit-profile" onClick={handleEditClick}>
-          {isEditing ? "Save Name" : "Edit Name"}
+        <button 
+          className="btn-edit-profile" 
+          onClick={handleEditClick}
+          disabled={isSaving}
+        >
+          {isSaving ? "Saving..." : isEditing ? "Save Name" : "Edit Name"}
         </button>
       </div>
 

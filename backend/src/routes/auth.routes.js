@@ -26,5 +26,6 @@ router.post("/register", authRateLimiter, register);
 router.post("/login", authRateLimiter, login);
 router.get("/total-users", getTotalUsers);
 router.get("/me", authenticate, me);
+router.put("/update-profile", protect, updateProfile);
 
 module.exports = router;
