@@ -17,6 +17,7 @@ model User {
   ratingSnapshots       RatingSnapshot[]
   solvedProblems        SolvedProblem[]
   platformStats         PlatformStats[]
+  username              String?
 }
 
 model ContestAccount {
