@@ -78,10 +78,14 @@ const Profile = () => {
       setIsSaving(true);
       setErrorMsg('');
 
-      try {
-        // Replace with your actual base URL or axios instance configuration
+     try {
         const token = localStorage.getItem('token'); 
-        const response = await fetch('/api/auth/update-profile', {
+        
+        // Ensure we hit the Render backend, not the Vercel frontend!
+        // Fallback to localhost if you are testing on your own machine.
+        const backendUrl = import.meta.env.VITE_API_URL || 'https://ai-contest-tracker-v2.onrender.com';
+        
+        const response = await fetch(`${backendUrl}/api/auth/update-profile`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -90,23 +94,27 @@ const Profile = () => {
           body: JSON.stringify({ username: username.trim() })
         });
 
-        const resData = await response.json();
+        // Safety check to read the raw text first in case it STILL isn't JSON
+        const rawText = await response.text();
+        let resData;
+        
+        try {
+          resData = JSON.parse(rawText);
+        } catch (parseError) {
+          throw new Error("Server returned an invalid response. Check backend logs.");
+        }
 
         if (!response.ok) {
           throw new Error(resData.message || "Failed to update profile name on the server.");
         }
 
         console.log("Database updated successfully:", resData.data.user.username);
-        
-        // CRITICAL: If your useAuth() context provides a way to update global state without forcing a hard reload,
-        // you would trigger it here so the entire app synchronizes instantly, e.g.:
-        // if (updateUserContext) updateUserContext(resData.data.user);
-        
         setIsEditing(false);
+        
       } catch (err) {
         console.error("PROFILE_UPDATE_ERROR:", err.message);
         setErrorMsg(err.message || "Connection error. Reverting change locally.");
-        // Optional fallback: Reset string back to context value on failure
+        const currentName = user?.username || user?.email?.split('@')[0] || "User";
         setUsername(currentName);
       } finally {
         setIsSaving(false);
