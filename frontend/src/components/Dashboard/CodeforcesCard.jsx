@@ -41,7 +41,7 @@ const RANK_COLORS = {
 };
 
 function rankColor(rank = '') {
-  return RANK_COLORS[rank.toLowerCase()] ?? '#808080';
+  return RANK_COLORS[rank?.toLowerCase() ||'unrated'] ?? '#808080';
 }
 
 // ─── Shared hover-border wrapper ──────────────────────────────────────────────

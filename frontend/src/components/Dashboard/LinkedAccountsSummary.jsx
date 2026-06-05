@@ -14,6 +14,7 @@ const PLATFORM_META = {
 };
 
 function formatPlatform(value) {
+  if (!value) return 'Unknown';
   return value
     .toLowerCase()
     .split('_')

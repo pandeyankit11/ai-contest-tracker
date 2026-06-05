@@ -13,6 +13,9 @@ const DifficultyBreakdown = ({ data }) => {
   }
 
   const getDifficultyColor = (difficulty) => {
+    // --- THE FIX: Catch null or the literal string "null" immediately ---
+    if (!difficulty || difficulty === 'null') return '#9ca3af'; 
+
     const str = String(difficulty).toLowerCase();
     const colors = {
       easy: '#10b981',
@@ -27,8 +30,13 @@ const DifficultyBreakdown = ({ data }) => {
   };
 
   const getDifficultyLabel = (difficulty) => {
+    // --- THE FIX: Catch nulls and return a clean "Unrated" label ---
+    if (!difficulty || difficulty === 'null') return 'Unrated';
+
     const str = String(difficulty);
     if (!isNaN(str)) return str; // Return numerical ratings as-is
+    
+    // Capitalize the first letter (e.g. "easy" -> "Easy")
     return str.charAt(0).toUpperCase() + str.slice(1);
   };
 
