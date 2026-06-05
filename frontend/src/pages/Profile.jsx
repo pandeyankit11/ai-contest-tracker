@@ -79,7 +79,7 @@ const Profile = () => {
       setErrorMsg('');
 
      try {
-        const token = localStorage.getItem('token'); 
+        const token = localStorage.getItem('authToken'); 
         
         // Ensure we hit the Render backend, not the Vercel frontend!
         // Fallback to localhost if you are testing on your own machine.
