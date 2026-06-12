@@ -111,7 +111,7 @@ const updateProfile = asyncHandler(async (req, res) => {
   });
 });
 
-// Don't forget to export updateProfile at the bottom of the file!
+
 
 module.exports = {
   login,

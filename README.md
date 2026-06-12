@@ -1,226 +1,111 @@
-# AI Contest Tracker
-
-A full-stack web application for tracking competitive programming contests and managing coding platform accounts.
-
-Built using React, Node.js, Express, PostgreSQL, and Prisma.
-
----
-
-## Features
-
-### Authentication
-
-* User registration and login
-* JWT-based authentication
-* Protected routes
-* Persistent user sessions
-
-### Dashboard
-
-* Personalized dashboard
-* Linked account summary
-* Upcoming contest preview
-* Codeforces profile integration
-
-### Linked Accounts
-
-* Connect coding platform accounts
-* Add and remove accounts
-* Store platform handles securely
-* Dashboard updates automatically
-
-### Contest Browser
-
-* Browse upcoming contests
-* Pagination support
-* Platform filtering
-* Days-based filtering
-* Contest details including:
-
-  * Name
-  * Platform
-  * Start Time
-  * Duration
-  * Phase
-
-### Security
-
-* Password hashing
-* Helmet security middleware
-* Rate limiting on authentication routes
-* Input validation
-* Protected API endpoints
-
----
-
-## Tech Stack
-
-### Frontend
-
-* React
-* React Router
-* Vite
-* Context API
-* Custom CSS
-
-### Backend
-
-* Node.js
-* Express.js
-* Prisma ORM
-
-### Database
-
-* PostgreSQL
-
-### Authentication
-
-* JWT
-* bcrypt
-
----
-
-## Project Architecture
-
-Frontend (React + Vite)
-
-↓
-
-REST API (Express)
-
-↓
-
-Prisma ORM
-
-↓
-
-PostgreSQL
-
-↓
-
-Codeforces API
-
----
-
-## API Endpoints
-
-### Authentication
-
-POST /api/auth/register
-
-POST /api/auth/login
-
-GET /api/auth/me
-
-### Codeforces
-
-GET /api/codeforces/profile
-
-### Platform Accounts
-
-GET /api/platforms
-
-POST /api/platforms
-
-DELETE /api/platforms/:id
-
-### Contests
-
-POST /api/contests/sync
-
-GET /api/contests
-
-GET /api/contests/upcoming
-
----
-
-## Local Setup
-
-### Clone Repository
-
-git clone <repository-url>
-
-cd ai-contest-tracker
-
-### Backend
-
-cd backend
-
-npm install
-
-Create a .env file and configure:
-
-DATABASE_URL=
-
-JWT_SECRET=
-
-PORT=
-
-Run migrations:
-
-npx prisma migrate dev
-
-Start server:
-
-npm run dev
-
-### Frontend
-
-cd frontend
-
-npm install
-
-npm run dev
-
-Frontend:
-
-http://localhost:5173
-
-Backend:
-
-http://localhost:5000
-
----
-
-## Screenshots
-
-### Login Page
-
-![alt text](image-3.png)
-
-### Dashboard
-
-![alt text](image-1.png)
-
-### Linked Accounts
-
-![alt text](image-1.png)
-
-### Contest Browser
-
-![alt text](image-2.png)
-
----
-
-## Future Improvements
-
-* LeetCode integration
-* Contest reminders
-* Email notifications
-* Advanced analytics
-* User statistics
-* Additional competitive programming platforms
-
----
-
-## Author
-
-Ankit Pandey
-
-BITS Pilani Goa Campus
-
----
-
-## Version
-
-Current Release: V1.0 MVP
+# AI Contest Tracker v2.1 🚀
+
+A unified, full-stack dashboard designed to track competitive programming performances, analyze problem-solving trends, and monitor upcoming competitions across platforms like Codeforces and LeetCode.
+
+[![Live Demo](https://img.shields.io/badge/Live_Demo-ai--contest--tracker.vercel.app-blue?style=for-the-badge)](https://ai-contest-tracker.vercel.app)
+
+## 💡 Project Philosophy
+* **Real Users First:** Delivering core value to real users is more important than rushing AI features.
+* **Data Over Hype:** Public launch is gated behind robust, actionable analytics. 
+* **Earned Intelligence:** AI features will only be introduced once a solid foundation of active users and reliable data is established.
+
+## 🌟 Overview
+Managing profiles across multiple coding platforms can be fragmented. AI Contest Tracker centralizes your competitive programming journey by pulling data from Codeforces and LeetCode into a single, comprehensive dashboard. Whether you are tracking your rating progression, analyzing your strongest topics, or planning for upcoming contests, this tool provides the intelligence you need to improve.
+
+## 🛠️ Current State & Tech Stack
+The project is currently deployed and functional with the following architecture:
+* **Frontend:** React.js (Deployed via Vercel)
+* **Backend:** Node.js / Express.js (Deployed via Render)
+* **Database:** PostgreSQL hosted on Neon DB
+* **ORM:** Prisma
+* **Authentication:** Fully custom JWT-based authentication
+
+## ✨ Features (v2.0 & v2.1)
+* **Contest Aggregation:** Centralized browser to discover upcoming contests with advanced filters (platform, time range).
+* **Secure Multi-Account Linking:** Securely link and manage multiple platform handles under a single authenticated user session.
+* **Deep Analytics Engine:** * Granular topic analysis and solved-problem trend charts.
+  * Difficulty progression tracking with visual difficulty bars and water-filled progress circles.
+  * Rating history graphs to track Elo changes over time.
+* **Activity Heatmaps:** GitHub-style contribution graphs for both Codeforces and LeetCode.
+* **Unified Dashboard:** Get a bird's-eye view of your current ratings, maximum ratings, active ranks, and upcoming events.
+
+## 🚀 Local Setup & Installation
+
+### Prerequisites
+* Node.js (v16+)
+* PostgreSQL instance (Local or Cloud like Neon/Supabase)
+
+### 1. Clone the repository
+    git clone https://github.com/pandeyankit11/ai-contest-tracker
+    cd ai-contest-tracker
+
+### 2. Install Dependencies
+    # Install backend dependencies
+    cd backend
+    npm install
+
+    # Install frontend dependencies
+    cd ../frontend
+    npm install
+
+### 3. Environment Variables
+Create a .env file in the backend directory. Use .env.example as a template:
+
+    DATABASE_URL="postgresql://<user>:<password>@<host>:<port>/<dbname>?sslmode=require"
+    JWT_SECRET=your_super_secret_jwt_key
+    JWT_EXPIRES_IN=7d
+    NODE_ENV=development
+
+### 4. Database Setup (Prisma)
+Run the following commands in the backend directory:
+
+    npx prisma db push
+    npx prisma generate
+
+### 5. Run the Application
+Start both development servers:
+
+    # In the backend directory
+    npm run dev
+
+    # In the frontend directory
+    npm run dev
+
+## 🗺️ Master Roadmap
+
+### ✅ Phase 1: Core Dashboard (V2.0 & V2.1)
+- [x] Authentication complete (JWT, Sessions)
+- [x] React frontend deployed
+- [x] Express backend deployed
+- [x] PostgreSQL + Prisma + Neon DB configured
+- [x] Contest Aggregation & Upcoming Contests Browser
+- [x] Rating Analytics & Graphs
+- [x] Problems Solved Analytics & Solved Trends
+- [x] Activity Heatmaps
+- [x] Difficulty Progress Bars & Water-filled Progress Circles
+- [ ] Contest Calendar *(In Progress)*
+
+**🚀 PUBLIC LAUNCH PLANNED UPON COMPLETION OF V2.1**
+
+### ⏳ Phase 2: Social & Community (V2.2)
+- [ ] Friends System & Friend Requests
+- [ ] Profile Comparisons
+- [ ] Friend Leaderboards
+- [ ] College / University Leaderboards
+
+### 🤖 Phase 3: Artificial Intelligence (V3.0)
+- [ ] AI Contest Coach
+- [ ] AI Weakness Detection
+- [ ] Personalized AI Recommendations
+- [ ] Automated AI Study Plans
+
+### 🏆 Phase 4: Gamification (V4.0)
+- [ ] Daily/Weekly Streaks
+- [ ] Achievement Badges
+- [ ] Custom Challenges
+- [ ] Team Competitions
+
+## 👨‍💻 Author
+**Ankit Pandey**
+* Email: pandeyankit9a@gmail.com
+* GitHub: [@pandeyankit11](https://github.com/pandeyankit11)
